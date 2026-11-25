@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Apple">
+  <rect width="64" height="64" fill="#0a0a0a"/>
+  <path fill="#F5F5F7" d="M42 18c-2 0-5 1-7 3-2-2-5-3-8-3-6 0-12 5-12 14 0 10 7 19 12 19 3 0 5-2 8-2s5 2 9 2c5 0 10-7 13-14-10-5-8-18-15-19z"/>
+  <path fill="#A1A1A6" d="M38 12c2-3 3-6 3-9-4 1-7 3-9 7 3 1 5 1 6 2z"/>
+</svg>

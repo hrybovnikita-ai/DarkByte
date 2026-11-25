@@ -1,0 +1,37 @@
+import { apiError, handleRouteError } from "@/server/api/response";
+import { checkRateLimit, clientIp } from "@/server/middleware/rate-limit";
+
+type RouteContext = { params: Promise<Record<string, string>> };
+
+export function withApiHandler(
+  handler: (request: Request, context: RouteContext) => Promise<Response>,
+) {
+  return async (request: Request, context: RouteContext): Promise<Response> => {
+    try {
+      const rate = checkRateLimit(`${clientIp(request)}:${request.method}`);
+      if (!rate.allowed) {
+        return apiError("Too many requests", 429, "RATE_LIMIT", {
+          retryAfter: rate.retryAfter,
+        });
+      }
+      return await handler(request, context);
+    } catch (error) {
+      if (error instanceof Error) {
+        if (error.message === "PAYLOAD_TOO_LARGE") {
+          return apiError("Request body too large", 400, "PAYLOAD_TOO_LARGE");
+        }
+        if (error.message === "INVALID_JSON") {
+          return apiError("Invalid JSON body", 400, "INVALID_JSON");
+        }
+        if (error.message === "FIREBASE_NOT_CONFIGURED") {
+          return apiError(
+            "Authentication service is not configured",
+            503,
+            "AUTH_NOT_CONFIGURED",
+          );
+        }
+      }
+      return handleRouteError(error);
+    }
+  };
+}

@@ -1,0 +1,281 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum PublishStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum FavoriteTargetType {
+  WORLD
+  MONSTER
+  STORY
+  GAME
+  SECRET_FILE
+  PIXEL_PROJECT
+}
+
+model User {
+  id            String    @id @default(cuid())
+  firebaseUid   String?   @unique
+  email         String    @unique
+  emailVerified DateTime?
+  name          String?
+  image         String?
+  passwordHash  String?
+  role          Role      @default(USER)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  accounts         Account[]
+  sessions         Session[]
+  favorites          Favorite[]
+  pixelProjects      PixelProject[]
+  userAchievements   UserAchievement[]
+  conversations      Conversation[]
+
+  @@index([role])
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model World {
+  id              String        @id @default(cuid())
+  slug            String        @unique
+  code            String        @unique
+  title           String
+  category        String
+  headline        String
+  description     String        @db.Text
+  longDescription String        @db.Text
+  buttonLabel     String
+  routePath       String
+  sceneId         String
+  themePrimary    String
+  themeSecondary  String
+  themeAccent     String
+  themeGlow       String
+  atmosphereClass String
+  imageUrl        String?
+  status          PublishStatus @default(PUBLISHED)
+  sortOrder       Int           @default(0)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  monsters Monster[]
+  stories  Story[]
+  games    Game[]
+
+  @@index([status, sortOrder])
+}
+
+model Monster {
+  id          String        @id @default(cuid())
+  externalId  String?       @unique
+  name        String
+  threat      String
+  description String        @db.Text
+  icon        String?
+  worldId     String?
+  world       World?        @relation(fields: [worldId], references: [id], onDelete: SetNull)
+  status      PublishStatus @default(PUBLISHED)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@index([status])
+  @@index([worldId])
+  @@index([name])
+}
+
+model Story {
+  id          String        @id @default(cuid())
+  slug        String        @unique
+  title       String
+  summary     String        @db.Text
+  body        String        @db.Text
+  worldId     String?
+  world       World?        @relation(fields: [worldId], references: [id], onDelete: SetNull)
+  status      PublishStatus @default(PUBLISHED)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@index([status])
+  @@index([worldId])
+}
+
+model Game {
+  id          String        @id @default(cuid())
+  slug        String        @unique
+  title       String
+  genre       String
+  description String        @db.Text
+  playable    Boolean       @default(false)
+  worldId     String?
+  world       World?        @relation(fields: [worldId], references: [id], onDelete: SetNull)
+  status      PublishStatus @default(PUBLISHED)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@index([status])
+  @@index([playable])
+}
+
+model SecretFile {
+  id           String        @id @default(cuid())
+  fileCode     String        @unique
+  title        String
+  classification String
+  content      String        @db.Text
+  status       PublishStatus @default(PUBLISHED)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@index([status])
+}
+
+model PixelProject {
+  id          String        @id @default(cuid())
+  userId      String
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title       String
+  description String?       @db.Text
+  dataJson    Json          @default("{}")
+  status      PublishStatus @default(DRAFT)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@index([userId])
+  @@index([status])
+}
+
+model Favorite {
+  id           String             @id @default(cuid())
+  userId       String
+  user         User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  targetType   FavoriteTargetType
+  targetId     String
+  createdAt    DateTime           @default(now())
+
+  @@unique([userId, targetType, targetId])
+  @@index([userId])
+}
+
+model Achievement {
+  id          String        @id @default(cuid())
+  code        String        @unique
+  title       String
+  description String        @db.Text
+  points      Int           @default(0)
+  status      PublishStatus @default(PUBLISHED)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  userAchievements UserAchievement[]
+
+  @@index([status])
+}
+
+model UserAchievement {
+  id            String      @id @default(cuid())
+  userId        String
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  achievementId String
+  achievement   Achievement @relation(fields: [achievementId], references: [id], onDelete: Cascade)
+  unlockedAt    DateTime    @default(now())
+
+  @@unique([userId, achievementId])
+  @@index([userId])
+}
+
+model Conversation {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  messages Message[]
+
+  @@index([userId])
+}
+
+model Message {
+  id             String       @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  role           String
+  content        String       @db.Text
+  createdAt      DateTime     @default(now())
+
+  @@index([conversationId])
+}
+
+model Company {
+  id                String        @id @default(cuid())
+  slug              String        @unique
+  name              String
+  logo              String
+  website           String
+  description       String        @db.Text
+  category          String
+  accentColor       String
+  accentPalette     Json
+  integrationStatus String        @default("INSPIRATION_ONLY")
+  sortOrder         Int           @default(0)
+  status            PublishStatus @default(PUBLISHED)
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  @@index([status, sortOrder])
+  @@index([category])
+}

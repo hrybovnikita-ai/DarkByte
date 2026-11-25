@@ -1,0 +1,160 @@
+openapi: 3.1.0
+info:
+  title: DARKBYTE API
+  version: 3.0.0
+  description: REST API for the DARKBYTE multicolor pixel universe.
+servers:
+  - url: http://localhost:3000
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: Firebase ID token
+  schemas:
+    ApiSuccess:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data: {}
+        meta:
+          type: object
+    ApiError:
+      type: object
+      properties:
+        success:
+          type: boolean
+        error:
+          type: object
+          properties:
+            message:
+              type: string
+            code:
+              type: string
+paths:
+  /api/companies:
+    get:
+      summary: List technology innovators catalog (read-only, inspiration only)
+      parameters:
+        - in: query
+          name: page
+          schema: { type: integer }
+        - in: query
+          name: pageSize
+          schema: { type: integer }
+        - in: query
+          name: search
+          schema: { type: string }
+        - in: query
+          name: category
+          schema: { type: string }
+      responses:
+        "200":
+          description: Company catalog items with id, name, slug, logo, website, description, category, accentColor, integrationStatus
+  /api/health:
+    get:
+      summary: Service health
+      responses:
+        "200":
+          description: OK
+  /api/worlds:
+    get:
+      summary: List worlds (published for public)
+      parameters:
+        - in: query
+          name: page
+          schema: { type: integer }
+        - in: query
+          name: search
+          schema: { type: string }
+      responses:
+        "200": { description: OK }
+    post:
+      security: [{ bearerAuth: [] }]
+      summary: Create world (ADMIN)
+      responses:
+        "201": { description: Created }
+        "401": { description: Unauthorized }
+        "403": { description: Forbidden }
+  /api/worlds/{id}:
+    get:
+      summary: Get world by id or slug
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        "200": { description: OK }
+        "404": { description: Not Found }
+    put:
+      security: [{ bearerAuth: [] }]
+      summary: Replace world (ADMIN)
+      responses:
+        "200": { description: OK }
+    patch:
+      security: [{ bearerAuth: [] }]
+      summary: Partial update (ADMIN)
+      responses:
+        "200": { description: OK }
+    delete:
+      security: [{ bearerAuth: [] }]
+      summary: Delete world (ADMIN)
+      responses:
+        "204": { description: No Content }
+  /api/monsters:
+    get:
+      summary: List monsters
+      responses:
+        "200": { description: OK }
+    post:
+      security: [{ bearerAuth: [] }]
+      summary: Create monster (ADMIN)
+      responses:
+        "201": { description: Created }
+  /api/monsters/{id}:
+    get:
+      responses:
+        "200": { description: OK }
+    put:
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200": { description: OK }
+    patch:
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200": { description: OK }
+    delete:
+      security: [{ bearerAuth: [] }]
+      responses:
+        "204": { description: No Content }
+  /api/users/me:
+    get:
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200": { description: Current user profile }
+    patch:
+      security: [{ bearerAuth: [] }]
+      summary: Update own profile (name)
+      responses:
+        "200": { description: OK }
+  /api/favorites:
+    get:
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200": { description: User favorites }
+    post:
+      security: [{ bearerAuth: [] }]
+      responses:
+        "201": { description: Created }
+        "409": { description: Conflict }
+  /api/favorites/{id}:
+    get:
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200": { description: OK }
+    delete:
+      security: [{ bearerAuth: [] }]
+      responses:
+        "204": { description: No Content }
