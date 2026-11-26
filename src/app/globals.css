@@ -756,7 +756,14 @@ a {
 .chat-history { flex: 1; overflow: auto; }
 .chat-history li { margin-bottom: .35rem; border-radius: 4px; }
 .chat-history-active { background: #1a1010; border: 1px solid #3f1515; }
-.chat-history-row { display: flex; align-items: center; gap: .25rem; }
+.chat-history-row {
+  display: flex;
+  align-items: center;
+  gap: .25rem;
+  border-radius: 6px;
+  transition: background 160ms ease;
+}
+.chat-history-row:hover { background: #141414; }
 .chat-history-btn {
   flex: 1;
   overflow: hidden;
@@ -768,7 +775,12 @@ a {
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: .85rem;
+  cursor: pointer;
+  transition: color 160ms ease;
 }
+.chat-history-btn:hover { color: #fafafa; }
+.chat-history-menu { position: relative; z-index: 30; flex-shrink: 0; }
+.chat-pin { font-size: .7rem; opacity: .85; }
 .chat-more-btn, .chat-icon-btn {
   border: 1px solid #3f3f46;
   background: #111;
@@ -779,10 +791,18 @@ a {
 .chat-menu {
   position: absolute;
   right: 0;
-  z-index: 10;
-  min-width: 120px;
+  top: calc(100% + 4px);
+  z-index: 40;
+  min-width: 160px;
   border: 1px solid #3f3f46;
+  border-radius: 8px;
   background: #111;
+  box-shadow: 0 8px 28px #000a;
+}
+.chat-menu-confirm-text {
+  padding: .45rem .65rem .25rem;
+  font-size: .75rem;
+  color: #a1a1aa;
 }
 .chat-menu button {
   display: block;
@@ -795,6 +815,8 @@ a {
   font-size: .8rem;
 }
 .chat-menu button:hover { background: #27272a; }
+.chat-menu-danger { color: #f87171 !important; }
+.chat-menu-danger:hover { background: #2a1212 !important; }
 .chat-rename-row { display: flex; gap: .25rem; padding: .25rem; }
 .chat-rename-input {
   flex: 1;

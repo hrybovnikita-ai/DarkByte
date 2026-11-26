@@ -265,6 +265,7 @@ model Conversation {
   branchedFromMessageId String?
   parentConversation    Conversation?  @relation("ConversationBranch", fields: [branchedFromId], references: [id], onDelete: SetNull)
   childBranches         Conversation[] @relation("ConversationBranch")
+  pinnedAt  DateTime?
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 
@@ -274,6 +275,7 @@ model Conversation {
 
   @@index([userId])
   @@index([userId, updatedAt])
+  @@index([userId, pinnedAt, updatedAt])
   @@index([branchedFromId])
 }
 

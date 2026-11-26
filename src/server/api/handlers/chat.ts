@@ -15,6 +15,7 @@ const createConversationSchema = z.object({ title: z.string().trim().min(1).max(
 const patchConversationSchema = z.object({
   title: z.string().trim().min(1).max(120).optional(),
   modelId: z.string().min(1).max(80).optional(),
+  pinned: z.boolean().optional(),
 }).strict();
 const streamSchema = z.object({ content: z.string().trim().min(1).max(16000), modelId: z.string().min(1).max(80).optional() }).strict();
 
@@ -59,9 +60,9 @@ export async function listConversations(request: Request) {
       userId: user.id,
       ...(search ? { title: { contains: search, mode: "insensitive" } } : {}),
     },
-    orderBy: { updatedAt: "desc" },
+    orderBy: [{ pinnedAt: { sort: "desc", nulls: "last" } }, { updatedAt: "desc" }],
     take: 100,
-    select: { id: true, title: true, modelId: true, updatedAt: true, createdAt: true },
+    select: { id: true, title: true, modelId: true, pinnedAt: true, updatedAt: true, createdAt: true },
   });
   return privateJson({ items });
 }
@@ -78,7 +79,7 @@ export async function createConversation(request: Request) {
       title: body.title ?? "New conversation",
       modelId: model.id,
     },
-    select: { id: true, title: true, modelId: true, updatedAt: true, createdAt: true },
+    select: { id: true, title: true, modelId: true, pinnedAt: true, updatedAt: true, createdAt: true },
   });
   return apiCreated(created);
 }
@@ -133,8 +134,9 @@ export async function patchConversation(request: Request, id: string) {
     data: {
       ...(body.title ? { title: body.title } : {}),
       ...(body.modelId ? { modelId: body.modelId } : {}),
+      ...(body.pinned === true ? { pinnedAt: new Date() } : body.pinned === false ? { pinnedAt: null } : {}),
     },
-    select: { id: true, title: true, modelId: true, updatedAt: true, createdAt: true },
+    select: { id: true, title: true, modelId: true, pinnedAt: true, updatedAt: true, createdAt: true },
   });
   return privateJson(updated);
 }

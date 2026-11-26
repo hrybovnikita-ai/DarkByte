@@ -28,9 +28,9 @@ beforeEach(() => {
   vi.stubEnv("GEMINI_API_KEY", "test-gemini");
   mocks.auth.mockResolvedValue({ id: "user-a", role: "USER" });
   mocks.db.conversation.findMany.mockResolvedValue([]);
-  mocks.db.conversation.create.mockResolvedValue({ id: "conv-1", title: "New conversation", modelId: "gemini-3.8-flash", updatedAt: new Date(), createdAt: new Date() });
+  mocks.db.conversation.create.mockResolvedValue({ id: "conv-1", title: "New conversation", modelId: "gemini-3.8-flash", pinnedAt: null, updatedAt: new Date(), createdAt: new Date() });
   mocks.db.conversation.findUnique.mockResolvedValue({ id: "conv-1", userId: "user-a", title: "Test", modelId: "gemini-3.8-flash", messages: [] });
-  mocks.db.conversation.update.mockResolvedValue({ id: "conv-1", title: "Renamed", modelId: "gemini-3.8-flash", updatedAt: new Date(), createdAt: new Date() });
+  mocks.db.conversation.update.mockResolvedValue({ id: "conv-1", title: "Renamed", modelId: "gemini-3.8-flash", pinnedAt: new Date(), updatedAt: new Date(), createdAt: new Date() });
 });
 
 describe("chat API authorization", () => {
@@ -59,6 +59,16 @@ describe("chat API authorization", () => {
       body: JSON.stringify({ title: "Renamed" }),
     });
     expect((await patchConversation(patch, context)).status).toBe(200);
+
+    const pin = new Request("http://localhost/api/chat/conversations/conv-1", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pinned: true }),
+    });
+    expect((await patchConversation(pin, context)).status).toBe(200);
+    expect(mocks.db.conversation.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ pinnedAt: expect.any(Date) }) }),
+    );
   });
 
   it("deletes owned conversations", async () => {

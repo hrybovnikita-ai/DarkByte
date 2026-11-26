@@ -2,14 +2,22 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/contexts/auth-context";
 import { apiFetch } from "@/lib/api-fetch";
 import MarkdownMessage from "@/components/chat/MarkdownMessage";
 import MessageActionToolbar, { type FeedbackRating } from "@/components/chat/MessageActionToolbar";
 import PixelSkull from "@/components/chat/PixelSkull";
+import ConversationHistoryMenu from "@/components/chat/ConversationHistoryMenu";
 
-type ConversationSummary = { id: string; title: string | null; modelId: string; updatedAt: string; createdAt: string };
+type ConversationSummary = {
+  id: string;
+  title: string | null;
+  modelId: string;
+  pinnedAt: string | null;
+  updatedAt: string;
+  createdAt: string;
+};
 type ChatMessage = {
   id: string;
   role: string;
@@ -51,6 +59,8 @@ function consumeSseBlock(block: string, onEvent: (event: string, data: unknown) 
 export default function ChatApp() {
   const { user, loading } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const conversationId = searchParams.get("c");
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [mobileSidebar, setMobileSidebar] = useState(false);
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
@@ -68,6 +78,7 @@ export default function ChatApp() {
   const abortRef = useRef<AbortController | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const urlLoadRef = useRef<string | null>(null);
 
   const activeModel = useMemo(() => models.find((m) => m.id === modelId), [models, modelId]);
 
@@ -111,18 +122,47 @@ export default function ChatApp() {
     const response = await apiFetch(`/api/chat/conversations/${id}`, { cache: "no-store" });
     if (response.status === 401) {
       redirectToSignIn();
-      return;
+      return false;
     }
     const body = await response.json();
     if (!body.success) {
+      if (response.status === 404) {
+        router.replace("/chat");
+        urlLoadRef.current = null;
+        setActiveId(null);
+        setMessages([]);
+      }
       setError(apiFailureMessage(body, "Could not load conversation"));
-      return;
+      return false;
     }
     setActiveId(id);
     setMessages(body.data.messages);
     setModelId(body.data.modelId);
+    setStreamText("");
     setMobileSidebar(false);
-  }, [redirectToSignIn]);
+    urlLoadRef.current = id;
+    return true;
+  }, [redirectToSignIn, router]);
+
+  const selectConversation = useCallback((id: string) => {
+    if (streaming) abortRef.current?.abort();
+    setError("");
+    router.push(`/chat?c=${encodeURIComponent(id)}`, { scroll: false });
+  }, [router, streaming]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    if (!conversationId) {
+      urlLoadRef.current = null;
+      queueMicrotask(() => {
+        setActiveId(null);
+        setMessages([]);
+      });
+      return;
+    }
+    if (urlLoadRef.current === conversationId) return;
+    void loadConversation(conversationId);
+  }, [user?.id, conversationId, loadConversation]);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -144,6 +184,15 @@ export default function ChatApp() {
 
   async function newChat() {
     setError("");
+    if (activeId && messages.length === 0 && !streaming) {
+      urlLoadRef.current = null;
+      router.replace("/chat");
+      setActiveId(null);
+      setMessages([]);
+      setStreamText("");
+      setMobileSidebar(false);
+      return;
+    }
     const response = await apiFetch("/api/chat/conversations", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -159,6 +208,22 @@ export default function ChatApp() {
     setMessages([]);
     setStreamText("");
     setMobileSidebar(false);
+    urlLoadRef.current = body.data.id;
+    router.replace(`/chat?c=${encodeURIComponent(body.data.id)}`);
+  }
+
+  async function togglePin(id: string, pinned: boolean) {
+    const response = await apiFetch(`/api/chat/conversations/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pinned: !pinned }),
+    });
+    const body = await response.json();
+    if (!body.success) {
+      setError(apiFailureMessage(body, "Could not update chat"));
+      return;
+    }
+    void loadConversations();
   }
 
   async function removeChat(id: string) {
@@ -169,6 +234,8 @@ export default function ChatApp() {
     }
     setConversations((prev) => prev.filter((c) => c.id !== id));
     if (activeId === id) {
+      urlLoadRef.current = null;
+      router.replace("/chat");
       setActiveId(null);
       setMessages([]);
     }
@@ -206,7 +273,11 @@ export default function ChatApp() {
       conversationId = createdBody.data.id;
       setConversations((prev) => [createdBody.data, ...prev]);
       setActiveId(conversationId);
+      urlLoadRef.current = conversationId;
+      router.replace(`/chat?c=${encodeURIComponent(createdBody.data.id)}`);
     }
+
+    if (!conversationId) return;
 
     const optimisticUser: ChatMessage = {
       id: `temp-user-${crypto.randomUUID()}`,
@@ -364,7 +435,7 @@ export default function ChatApp() {
       return;
     }
     setConversations((prev) => [body.data, ...prev]);
-    await loadConversation(body.data.id);
+    router.push(`/chat?c=${encodeURIComponent(body.data.id)}`, { scroll: false });
   }
 
   async function retryAssistant(assistantMessageId: string) {
@@ -482,11 +553,19 @@ export default function ChatApp() {
                 </div>
               ) : (
                 <div className="chat-history-row">
-                  <button type="button" className="chat-history-btn" onClick={() => void loadConversation(item.id)}>
+                  <button
+                    type="button"
+                    className="chat-history-btn"
+                    aria-current={item.id === activeId ? "true" : undefined}
+                    onClick={() => selectConversation(item.id)}
+                  >
+                    {item.pinnedAt ? <span className="chat-pin" aria-hidden="true">📌 </span> : null}
                     {item.title ?? "New conversation"}
                   </button>
-                  <ConversationMenu
+                  <ConversationHistoryMenu
+                    pinned={Boolean(item.pinnedAt)}
                     onRename={() => { setRenaming(item.id); setRenameValue(item.title ?? ""); }}
+                    onTogglePin={() => void togglePin(item.id, Boolean(item.pinnedAt))}
                     onDelete={() => void removeChat(item.id)}
                   />
                 </div>
@@ -629,21 +708,6 @@ export default function ChatApp() {
           </p>
         </div>
       </section>
-    </div>
-  );
-}
-
-function ConversationMenu({ onRename, onDelete }: { onRename: () => void; onDelete: () => void }) {
-  const [open, setOpen] = useState(false);
-  return (
-    <div className="relative">
-      <button type="button" className="chat-more-btn" onClick={() => setOpen((o) => !o)} aria-label="Conversation actions">⋯</button>
-      {open && (
-        <div className="chat-menu">
-          <button type="button" onClick={() => { onRename(); setOpen(false); }}>Rename</button>
-          <button type="button" onClick={() => { onDelete(); setOpen(false); }}>Delete</button>
-        </div>
-      )}
     </div>
   );
 }
