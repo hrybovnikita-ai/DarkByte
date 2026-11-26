@@ -217,16 +217,12 @@ function LegacySignInPage() {
             </button>
           </form>
 
-          {!authActions.configured && (
-            <p className="mt-4 text-center text-xs text-amber-500">
-              Auth.js is not fully configured. Set AUTH_SECRET and DATABASE_URL
-              in .env.local (see .env.example).
-            </p>
-          )}
-          {authActions.status &&
-            !authActions.status.googleOAuthConfigured && (
-              <p className="mt-2 text-center text-xs text-zinc-600">
-                Google OAuth is not configured yet.
+          {process.env.NODE_ENV === "development" &&
+            authActions.status !== null &&
+            !authActions.status.authConfigured && (
+              <p className="mt-4 text-center text-xs text-amber-500">
+                Local dev: set AUTH_SECRET and DATABASE_URL in .env.local (see
+                .env.example).
               </p>
             )}
 
@@ -238,13 +234,19 @@ function LegacySignInPage() {
             <div className="h-px flex-1 bg-zinc-800" />
           </div>
 
-          <button
-            type="button"
-            onClick={handleGoogle}
-            className="flex w-full items-center justify-center gap-3 border border-zinc-700 bg-[#080808] px-5 py-3 text-lg transition hover:border-red-500 hover:bg-[#151515]"
-          >
-            Continue with Google
-          </button>
+          {authActions.status?.googleOAuthConfigured ? (
+            <button
+              type="button"
+              onClick={handleGoogle}
+              className="flex w-full items-center justify-center gap-3 border border-zinc-700 bg-[#080808] px-5 py-3 text-lg transition hover:border-red-500 hover:bg-[#151515]"
+            >
+              Continue with Google
+            </button>
+          ) : process.env.NODE_ENV === "development" ? (
+            <p className="text-center text-xs text-zinc-600">
+              Google OAuth is not configured (local dev).
+            </p>
+          ) : null}
 
           {message && (
             <p

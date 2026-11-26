@@ -13,7 +13,18 @@
     "db:seed": "tsx prisma/seed.ts",
     "postinstall": "node scripts/prisma-generate.mjs",
     "typecheck": "next typegen && tsc --noEmit",
-    "db:deploy": "node scripts/db-migrate.mjs deploy"
+    "db:deploy": "node scripts/db-migrate.mjs deploy",
+    "db:status": "node scripts/db-migrate.mjs status",
+    "test:ai": "tsx scripts/test-ai-providers.mjs",
+    "test:openrouter": "tsx scripts/test-openrouter.mjs",
+    "test:e2e:chat": "tsx scripts/e2e-chat-http.mjs",
+    "test:e2e:groq": "tsx scripts/e2e-chat-groq.mjs",
+    "test:memory": "tsx scripts/test-memory-flow.mjs",
+    "test:integration:db": "node scripts/run-integration-vitest.mjs"
+  },
+  "overrides": {
+    "effect": "3.22.5",
+    "deepmerge-ts": "8.0.2"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.3",

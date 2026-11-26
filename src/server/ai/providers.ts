@@ -20,15 +20,39 @@ function apiKey(model: AiModel) {
   return value;
 }
 
+/** Maps upstream HTTP failures to stable client errors (never user credit 402). */
+export function aiErrorFromHttpStatus(status: number, label: string, bodySnippet = ""): AiProviderError {
+  if (status === 429) {
+    return new AiProviderError("AI provider rate limit reached. Try again shortly.", "RATE_LIMIT", 429);
+  }
+  if (status === 401 || status === 403) {
+    return new AiProviderError(`Invalid API credentials for ${label}.`, "NOT_CONFIGURED", 503);
+  }
+  if (status === 404) {
+    return new AiProviderError("Selected model is unavailable.", "UNAVAILABLE", 503);
+  }
+  if (status === 402) {
+    return new AiProviderError(
+      `${label} billing is unavailable on the provider side. Your DARKBYTE credits were not charged — try another model.`,
+      "UNAVAILABLE",
+      503,
+    );
+  }
+  if (status === 503 || status === 529) {
+    return new AiProviderError(
+      `${label} is temporarily overloaded. Your credits were not charged — try again or pick another model.`,
+      "UNAVAILABLE",
+      503,
+    );
+  }
+  const detail = bodySnippet ? `: ${bodySnippet.slice(0, 200)}` : "";
+  return new AiProviderError(`${label} failed (${status})${detail}`, "UPSTREAM", 502);
+}
+
 async function assertOk(response: Response, label: string) {
   if (response.ok) return;
-  if (response.status === 429) throw new AiProviderError("AI provider rate limit reached. Try again shortly.", "RATE_LIMIT", 429);
-  if (response.status === 401 || response.status === 403) {
-    throw new AiProviderError(`Invalid API credentials for ${label}.`, "NOT_CONFIGURED", 503);
-  }
-  if (response.status === 404) throw new AiProviderError("Selected model is unavailable.", "UNAVAILABLE", 503);
   const body = await response.text().catch(() => "");
-  throw new AiProviderError(`${label} failed (${response.status})${body ? `: ${body.slice(0, 200)}` : ""}`, "UPSTREAM", 502);
+  throw aiErrorFromHttpStatus(response.status, label, body);
 }
 
 function parseOpenAiSse(buffer: string, onDelta: (text: string) => void) {
