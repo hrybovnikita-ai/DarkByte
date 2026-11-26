@@ -25,6 +25,9 @@ export function withApiHandler(
         if (error.message === "INVALID_JSON") {
           return apiError("Invalid JSON body", 400, "INVALID_JSON");
         }
+        if (error.message === "SENSITIVE_FIELD_REJECTED") {
+          return apiError("Payment details must not be sent to the server", 400, "SENSITIVE_FIELD_REJECTED");
+        }
         if (error.message === "FIREBASE_NOT_CONFIGURED") {
           return apiError(
             "Authentication service is not configured",

@@ -1,12 +1,12 @@
 import SiteFooter from "@/components/layout/SiteFooter";
 import SiteHeader from "@/components/layout/SiteHeader";
-import CheckoutLauncher from "@/components/billing/CheckoutLauncher";
+import IntegratedCheckout from "@/components/billing/IntegratedCheckout";
 
 export default function CheckoutPage() {
   return (
-    <div className="min-h-screen bg-[#080808] font-mono text-white">
+    <div className="min-h-screen bg-[#050508] font-mono text-white">
       <SiteHeader />
-      <CheckoutLauncher />
+      <IntegratedCheckout />
       <SiteFooter />
     </div>
   );

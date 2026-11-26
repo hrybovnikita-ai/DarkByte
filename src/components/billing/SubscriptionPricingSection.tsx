@@ -124,7 +124,7 @@ export default function SubscriptionPricingSection() {
         })}
       </div>
       <p className="mt-8 text-center text-xs tracking-widest text-zinc-400">
-        VISA · MASTERCARD · GOOGLE PAY · APPLE PAY · STRIPE HOSTED CHECKOUT
+        VISA · MASTERCARD · GOOGLE PAY · APPLE PAY · IN-APP CHECKOUT
       </p>
       <p className="mt-3 text-center text-xs text-zinc-500">Sandbox test mode only. Stripe collects card details — never stored on DARKBYTE.</p>
     </section>

@@ -13,6 +13,11 @@ const isProtectedRoute = createRouteMatcher([
   "/admin(.*)",
   "/checkout",
   "/checkout/",
+  "/checkout/demo",
+  "/checkout/demo/",
+  "/checkout/demo/success(.*)",
+  "/checkout/stripe",
+  "/checkout/stripe/",
   "/checkout/success(.*)",
 ]);
 

@@ -16,6 +16,7 @@ function CheckoutSuccessBody() {
   const params = useSearchParams();
   const sessionId = params.get("session_id");
   const kind = params.get("kind");
+  const embedded = params.get("embedded") === "1";
   const [status, setStatus] = useState<VerifyState>("pending");
 
   useEffect(() => {
@@ -23,7 +24,8 @@ function CheckoutSuccessBody() {
   }, [loading, user, router]);
 
   useEffect(() => {
-    if (!user || !sessionId) return;
+    if (!user) return;
+    if (!sessionId && !(kind === "subscription" && embedded)) return;
     let cancelled = false;
     let attempts = 0;
 
@@ -56,8 +58,10 @@ function CheckoutSuccessBody() {
         if (!response.ok || !body.success) throw new Error("Billing unavailable");
         const confirmed = body.data.payments.some(
           (entry: { sessionId: string | null; status: string; creditsGranted: boolean }) =>
-            entry.sessionId === sessionId && entry.status === "SUCCEEDED" && entry.creditsGranted,
-        );
+            entry.status === "SUCCEEDED" &&
+            entry.creditsGranted &&
+            (embedded ? true : entry.sessionId === sessionId),
+        ) || Boolean(body.data.subscription?.status === "ACTIVE" && embedded);
         if (cancelled) return;
         if (confirmed) {
           setStatus("confirmed");
@@ -76,7 +80,7 @@ function CheckoutSuccessBody() {
     return () => {
       cancelled = true;
     };
-  }, [user, sessionId, kind]);
+  }, [user, sessionId, kind, embedded]);
 
   const isSubscription = kind === "subscription";
 

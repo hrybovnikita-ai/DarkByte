@@ -33,11 +33,22 @@ Create six **recurring** Prices in the Stripe test dashboard that match [subscri
 
 Amounts must match the catalog (e.g. Pro monthly = $15.00 USD).
 
+## Demo checkout (no Stripe)
+
+| Page / API | Role |
+| --- | --- |
+| `/checkout/demo` | Custom UI — card fields stay in the browser |
+| `POST /api/demo/checkout` | Body: `planId`, `interval`, `paymentMethod` only |
+| `GET /api/demo/billing/status` | Isolated demo credits + history |
+
+Demo credits are stored separately from real `CreditAccount` balances.
+
 ## API routes
 
 | Method | Path | Role |
 | --- | --- | --- |
-| `POST` | `/api/stripe/checkout` | Start subscription Checkout (auth + idempotency key) |
+| `POST` | `/api/stripe/embedded-checkout` | In-app Payment Element (`clientSecret`, test mode) |
+| `POST` | `/api/stripe/checkout` | Optional legacy hosted session (UI does not redirect) |
 | `POST` | `/api/stripe/webhook` | Stripe-signed webhooks |
 | `GET` | `/api/billing/status` | Subscription + payment history |
 | `POST` | `/api/credits/checkout` | One-time credit packs (unchanged) |
