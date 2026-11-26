@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useAuth } from "@/contexts/AuthProvider";
+import { useAuth } from "@/contexts/auth-context";
 import { apiFetch } from "@/lib/api-fetch";
 
 type Entry = { id: string; amount: number; kind: string; description: string; createdAt: string; stripeSessionId: string | null };

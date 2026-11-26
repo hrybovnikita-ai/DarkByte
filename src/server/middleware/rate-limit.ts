@@ -51,6 +51,36 @@ export function checkRateLimit(
   return { allowed: true };
 }
 
+export async function resolveRateLimitIdentity(request: Request): Promise<string> {
+  try {
+    const { isClerkAuthEnabled } = await import("@/server/auth/provider");
+    if (isClerkAuthEnabled()) {
+      const { auth } = await import("@clerk/nextjs/server");
+      const { userId } = await auth();
+      if (userId) return `user:${userId}`;
+    }
+  } catch {
+    /* fall back to IP */
+  }
+  const key = rateLimitKey(request, "api");
+  return `ip:${key}`;
+}
+
+export async function checkRateLimitAsync(
+  request: Request,
+  profile: RateLimitProfile = "api",
+): Promise<{ allowed: boolean; retryAfter?: number }> {
+  const { checkRateLimitRedis } = await import("@/server/middleware/rate-limit-redis");
+  const identity = await resolveRateLimitIdentity(request);
+  const redisKey = `${identity}:${profile}`;
+  const redisResult = await checkRateLimitRedis(redisKey, profile);
+  if (!redisResult.allowed) return redisResult;
+  if (identity.startsWith("user:")) {
+    return redisResult;
+  }
+  return checkRateLimit(request, profile);
+}
+
 /** @deprecated Use checkRateLimit(request) — kept for tests that pass raw keys. */
 export function checkRateLimitByKey(key: string, max = DEFAULT_MAX) {
   const now = Date.now();

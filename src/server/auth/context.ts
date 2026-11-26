@@ -1,6 +1,8 @@
 import type { Role } from "@prisma/client";
 import { requirePrisma } from "@/lib/db";
+import { resolveDbUserFromClerkId } from "@/server/auth/clerk-sync";
 import { isAuthSecretConfigured } from "@/server/auth/config";
+import { isClerkAuthEnabled } from "@/server/auth/provider";
 import { readAuthSession, readAuthTokenFromRequest } from "@/server/auth/session";
 
 export type AuthUser = {
@@ -23,6 +25,28 @@ export async function getAuthUser(
   request: Request,
   options?: { required?: boolean },
 ): Promise<AuthUser | null> {
+  if (isClerkAuthEnabled()) {
+    const { auth } = await import("@clerk/nextjs/server");
+    const { userId } = await auth();
+    if (!userId) {
+      if (options?.required) throw new Error("UNAUTHORIZED");
+      return null;
+    }
+    try {
+      const user = await resolveDbUserFromClerkId(userId);
+      return {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        image: user.image,
+      };
+    } catch {
+      if (options?.required) throw new Error("UNAUTHORIZED");
+      return null;
+    }
+  }
+
   if (!isAuthSecretConfigured()) {
     if (options?.required) {
       throw new Error("UNAUTHORIZED");

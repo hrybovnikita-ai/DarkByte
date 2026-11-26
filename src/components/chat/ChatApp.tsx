@@ -3,13 +3,21 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useAuth } from "@/contexts/AuthProvider";
+import { useAuth } from "@/contexts/auth-context";
 import { apiFetch } from "@/lib/api-fetch";
 import MarkdownMessage from "@/components/chat/MarkdownMessage";
+import MessageActionToolbar, { type FeedbackRating } from "@/components/chat/MessageActionToolbar";
 import PixelSkull from "@/components/chat/PixelSkull";
 
 type ConversationSummary = { id: string; title: string | null; modelId: string; updatedAt: string; createdAt: string };
-type ChatMessage = { id: string; role: string; content: string; modelId?: string | null; createdAt: string };
+type ChatMessage = {
+  id: string;
+  role: string;
+  content: string;
+  modelId?: string | null;
+  createdAt: string;
+  feedbackRating?: FeedbackRating | null;
+};
 type ModelOption = { id: string; label: string; provider: string; creditCost: number; configured: boolean };
 
 function apiFailureMessage(body: unknown, fallback: string) {
@@ -297,8 +305,147 @@ export default function ChatApp() {
     abortRef.current?.abort();
   }
 
+  async function submitFeedback(messageId: string, rating: FeedbackRating) {
+    const response = await apiFetch(`/api/chat/messages/${messageId}/feedback`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ rating }),
+    });
+    if (response.status === 401) {
+      redirectToSignIn();
+      return;
+    }
+    const body = await response.json();
+    if (!body.success) {
+      setError(apiFailureMessage(body, "Could not save feedback"));
+      return;
+    }
+    setMessages((prev) => prev.map((m) => (m.id === messageId ? { ...m, feedbackRating: rating } : m)));
+  }
+
+  async function revokeShareLink(shareId: string) {
+    if (!activeId) return;
+    await apiFetch(`/api/chat/conversations/${activeId}/share/${shareId}`, { method: "DELETE" });
+  }
+
+  async function createShareLink() {
+    if (!activeId) return null;
+    const response = await apiFetch(`/api/chat/conversations/${activeId}/share`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ confirm: true }),
+    });
+    if (response.status === 401) {
+      redirectToSignIn();
+      return null;
+    }
+    const body = await response.json();
+    if (!body.success) {
+      setError(apiFailureMessage(body, "Could not create share link"));
+      return null;
+    }
+    return { url: String(body.data.url), shareId: String(body.data.shareId) };
+  }
+
+  async function branchFromMessage(fromMessageId: string) {
+    if (!activeId || streaming) return;
+    const response = await apiFetch(`/api/chat/conversations/${activeId}/branch`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ fromMessageId }),
+    });
+    if (response.status === 401) {
+      redirectToSignIn();
+      return;
+    }
+    const body = await response.json();
+    if (!body.success) {
+      setError(apiFailureMessage(body, "Could not branch conversation"));
+      return;
+    }
+    setConversations((prev) => [body.data, ...prev]);
+    await loadConversation(body.data.id);
+  }
+
+  async function retryAssistant(assistantMessageId: string) {
+    if (!activeId || streaming) return;
+    const assistantIndex = messages.findIndex((m) => m.id === assistantMessageId);
+    if (assistantIndex < 0) return;
+
+    setMessages((prev) => prev.slice(0, assistantIndex));
+    setStreaming(true);
+    setStreamText("");
+    setError("");
+    abortRef.current = new AbortController();
+
+    try {
+      const response = await apiFetch(`/api/chat/conversations/${activeId}/regenerate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ assistantMessageId, modelId }),
+        signal: abortRef.current.signal,
+      });
+
+      if (!response.ok || !response.body) {
+        const body = await response.json().catch(() => null);
+        throw new Error(apiFailureMessage(body, "Regeneration failed"));
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let assistant = "";
+      let assistantId = `temp-assistant-${crypto.randomUUID()}`;
+      let streamError: string | null = null;
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const parts = buffer.split("\n\n");
+        buffer = parts.pop() ?? "";
+        for (const part of parts) {
+          consumeSseBlock(part, (event, data) => {
+            if (event === "token" && data && typeof data === "object" && "t" in data) {
+              assistant += String((data as { t: string }).t);
+              setStreamText(assistant);
+            }
+            if (event === "error" && data && typeof data === "object" && "message" in data) {
+              streamError = String((data as { message: string }).message);
+            }
+            if (event === "done" && data && typeof data === "object" && "assistantId" in data) {
+              assistantId = String((data as { assistantId: string }).assistantId);
+              window.dispatchEvent(new Event("credits-updated"));
+            }
+          });
+        }
+      }
+
+      if (streamError) throw new Error(streamError);
+      if (!assistant.trim()) throw new Error("The model returned an empty response.");
+
+      setMessages((prev) => [
+        ...prev,
+        { id: assistantId, role: "assistant", content: assistant, modelId, createdAt: new Date().toISOString() },
+      ]);
+      setStreamText("");
+      void loadConversations();
+    } catch (reason) {
+      if (reason instanceof Error && reason.name === "AbortError") {
+        setError("Generation stopped.");
+      } else {
+        setError(reason instanceof Error ? reason.message : "Regeneration failed");
+      }
+      if (activeId) void loadConversation(activeId);
+      setStreamText("");
+    } finally {
+      setStreaming(false);
+      abortRef.current = null;
+    }
+  }
+
   if (loading || !user) {
-    return <div className="chat-shell flex min-h-[70vh] items-center justify-center text-zinc-500">Loading chat…</div>;
+    return <div className="chat-shell-loading">Loading chat…</div>;
   }
 
   const showWelcome = messages.length === 0 && !streaming && !streamText;
@@ -306,10 +453,13 @@ export default function ChatApp() {
   return (
     <div className="chat-shell">
       {mobileSidebar && <button type="button" className="chat-backdrop" aria-label="Close sidebar" onClick={() => setMobileSidebar(false)} />}
-      <aside className={`chat-sidebar ${sidebarOpen ? "chat-sidebar-open" : "chat-sidebar-collapsed"} ${mobileSidebar ? "chat-sidebar-mobile-open" : ""}`}>
+      <aside
+        className={`chat-sidebar ${sidebarOpen ? "" : "chat-sidebar-collapsed"} ${mobileSidebar ? "chat-sidebar-mobile-open" : ""}`}
+        aria-hidden={!sidebarOpen && !mobileSidebar}
+      >
         <div className="chat-sidebar-head">
           <button type="button" className="chat-new-btn" onClick={() => void newChat()}>+ NEW CHAT</button>
-          <button type="button" className="chat-icon-btn xl:hidden" onClick={() => setMobileSidebar(false)} aria-label="Close">×</button>
+          <button type="button" className="chat-icon-btn lg:hidden" onClick={() => setMobileSidebar(false)} aria-label="Close sidebar">×</button>
         </div>
         <label className="chat-search-wrap">
           <span className="sr-only">Search conversations</span>
@@ -352,14 +502,29 @@ export default function ChatApp() {
       <section className="chat-main">
         <div className="chat-main-toolbar">
           <div className="flex items-center gap-2">
-            <button type="button" className="chat-icon-btn" onClick={() => setSidebarOpen((o) => !o)} aria-label="Toggle sidebar">☰</button>
-            <button type="button" className="chat-icon-btn xl:hidden" onClick={() => setMobileSidebar(true)} aria-label="Open history">☰</button>
+            <button
+              type="button"
+              className="chat-icon-btn hidden lg:inline-flex"
+              onClick={() => setSidebarOpen((o) => !o)}
+              aria-label={sidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
+            >
+              ☰
+            </button>
+            <button
+              type="button"
+              className="chat-icon-btn lg:hidden"
+              onClick={() => setMobileSidebar(true)}
+              aria-label="Open chat history"
+            >
+              ☰
+            </button>
             <span className="text-sm text-zinc-400">DarkByte AI</span>
           </div>
           <span className="chat-online"><span aria-hidden="true" /> ONLINE</span>
         </div>
 
         <div className="chat-messages">
+          <div className={`chat-messages-inner ${showWelcome ? "chat-messages-inner--welcome" : ""}`}>
           {showWelcome ? (
             <div className="chat-welcome">
               <PixelSkull />
@@ -384,7 +549,24 @@ export default function ChatApp() {
                 <article key={message.id} className={`chat-bubble chat-bubble-${message.role}`}>
                   <p className="chat-bubble-label">{message.role === "user" ? "You" : "DARKBYTE AI"}</p>
                   {message.role === "assistant" ? (
-                    <MarkdownMessage content={message.content} />
+                    <>
+                      <MarkdownMessage content={message.content} />
+                      {!message.id.startsWith("temp-") && activeId && (
+                        <MessageActionToolbar
+                          messageId={message.id}
+                          content={message.content}
+                          createdAt={message.createdAt}
+                          conversationId={activeId}
+                          feedbackRating={message.feedbackRating ?? null}
+                          busy={streaming}
+                          onFeedback={(rating) => submitFeedback(message.id, rating)}
+                          onRetry={() => retryAssistant(message.id)}
+                          onBranch={() => branchFromMessage(message.id)}
+                          onCreateShare={() => createShareLink()}
+                          onRevokeShare={(shareId) => revokeShareLink(shareId)}
+                        />
+                      )}
+                    </>
                   ) : (
                     <p className="whitespace-pre-wrap">{message.content}</p>
                   )}
@@ -400,11 +582,11 @@ export default function ChatApp() {
             </>
           )}
           <div ref={bottomRef} />
+          </div>
         </div>
 
-        {error && <p role="alert" className="chat-error">{error}</p>}
-
         <div className="chat-composer-wrap">
+          {error && <p role="alert" className="chat-error">{error}</p>}
           <div className="chat-composer">
             <textarea
               ref={textareaRef}

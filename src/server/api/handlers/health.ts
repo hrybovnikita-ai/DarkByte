@@ -6,6 +6,7 @@ import {
   isNextAuthOperational,
 } from "@/server/auth/config";
 import { apiSuccess } from "@/server/api/response";
+import { getAuthProviderMode, isClerkConfigured, isUpstashRedisConfigured } from "@/server/auth/provider";
 
 export async function healthCheck() {
   const databaseConfigured = isDatabaseConfigured();
@@ -31,11 +32,13 @@ export async function healthCheck() {
       connected: databaseConnected,
     },
     auth: {
-      authConfigured: isAuthFullyConfigured(),
-      nextAuthOperational: isNextAuthOperational(),
+      authConfigured: getAuthProviderMode() === "clerk" ? isClerkConfigured() : isAuthFullyConfigured(),
+      nextAuthOperational: getAuthProviderMode() === "authjs" && isNextAuthOperational(),
       googleOAuthConfigured: isGoogleOAuthConfigured(),
       emailConfigured: isEmailServiceConfigured(),
-      provider: "authjs",
+      provider: getAuthProviderMode(),
+      clerkConfigured: isClerkConfigured(),
+      upstashRedisConfigured: isUpstashRedisConfigured(),
     },
     timestamp: new Date().toISOString(),
   });

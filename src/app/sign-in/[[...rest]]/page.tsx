@@ -1,15 +1,9 @@
 "use client";
 
+import { ClerkAuthPanel } from "@/components/auth/ClerkAuthPanel";
 import { useState, type FormEvent } from "react";
 import Link from "next/link";
-import {
-  Eye,
-  EyeOff,
-  User,
-  Mail,
-  Lock,
-  ArrowLeft,
-} from "lucide-react";
+import { Eye, EyeOff, Mail, Lock, ArrowLeft } from "lucide-react";
 import { useAuthActions } from "@/components/auth/useAuthActions";
 
 const skull = [
@@ -24,8 +18,14 @@ const skull = [
   "0011111000",
 ];
 
-export default function SignUpPage() {
-  const [name, setName] = useState("");
+export default function SignInPage() {
+  if (process.env.NEXT_PUBLIC_AUTH_PROVIDER === "clerk") {
+    return <ClerkAuthPanel mode="sign-in" />;
+  }
+  return <LegacySignInPage />;
+}
+
+function LegacySignInPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -35,33 +35,16 @@ export default function SignUpPage() {
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (!name.trim() || !email.trim()) {
+    if (!email.trim() || !password) {
       setMessage("Please complete all fields.");
       return;
     }
 
-    if (password.length < 8) {
-      setMessage("Password must contain at least 8 characters.");
-      return;
-    }
-    if (!/[A-Za-z]/.test(password) || !/[0-9]/.test(password)) {
-      setMessage("Password must include at least one letter and one number.");
-      return;
-    }
-
     try {
-      const result = await authActions.register(
-        name.trim(),
-        email.trim(),
-        password,
-      );
-      const extra = result.notice ? ` ${result.notice}` : "";
-      setMessage(
-        `Account created. Verify your email before signing in.${extra}`,
-      );
+      await authActions.signInWithEmail(email.trim(), password);
     } catch (error) {
       setMessage(
-        error instanceof Error ? error.message : "Registration failed.",
+        error instanceof Error ? error.message : "Sign-in failed.",
       );
     }
   }
@@ -76,19 +59,31 @@ export default function SignUpPage() {
     }
   }
 
+  async function handleReset() {
+    if (!email.trim()) {
+      setMessage("Enter your email to receive a reset link.");
+      return;
+    }
+    try {
+      const msg = await authActions.requestPasswordReset(email.trim());
+      setMessage(msg);
+    } catch (error) {
+      setMessage(
+        error instanceof Error ? error.message : "Password reset failed.",
+      );
+    }
+  }
+
   const inputStyle =
     "w-full border border-zinc-800 bg-[#080808] py-3 pl-11 pr-4 text-lg text-white outline-none transition placeholder:text-zinc-600 focus:border-red-500";
 
   return (
     <main className="pixel-grid relative flex min-h-screen items-center justify-center overflow-hidden bg-[#080808] px-5 py-16 text-white">
-
-      {/* BACKGROUND GLOW */}
       <div
         aria-hidden="true"
         className="pointer-events-none absolute h-[500px] w-[500px] max-w-full rounded-full bg-red-900/20 blur-[130px]"
       />
 
-      {/* BACK BUTTON */}
       <Link
         href="/"
         className="absolute left-6 top-6 flex items-center gap-2 text-zinc-400 transition hover:text-red-500"
@@ -98,10 +93,7 @@ export default function SignUpPage() {
       </Link>
 
       <div className="relative z-10 w-full max-w-md">
-
-        {/* LOGO */}
         <div className="mb-8 flex flex-col items-center">
-
           <div
             role="img"
             aria-label="DarkByte pixel skull"
@@ -125,64 +117,25 @@ export default function SignUpPage() {
             )}
           </div>
 
-          <Link
-            href="/"
-            className="pixel-font text-xl text-red-500"
-          >
+          <Link href="/" className="pixel-font text-xl text-red-500">
             DARK<span className="text-white">BYTE</span>
           </Link>
 
           <p className="mt-5 tracking-widest text-red-500">
-            NEW USER DETECTED
+            RETURNING USER
           </p>
-
         </div>
 
-        {/* REGISTRATION FORM */}
         <div className="border border-red-950 bg-[#101010] p-6 shadow-[0_0_40px_rgba(220,38,38,0.08)] sm:p-8">
-
           <h1 className="pixel-font text-center text-sm leading-relaxed sm:text-lg">
-            CREATE ACCOUNT
+            SIGN IN
           </h1>
 
           <p className="mt-4 text-center text-xl text-zinc-500">
-            Enter the digital darkness.
+            Re-enter the digital darkness.
           </p>
 
-          <form
-            onSubmit={handleSubmit}
-            className="mt-8 space-y-5"
-          >
-
-            {/* NAME */}
-            <div>
-              <label
-                htmlFor="name"
-                className="mb-2 block tracking-widest text-zinc-400"
-              >
-                USERNAME
-              </label>
-
-              <div className="relative">
-                <User
-                  size={18}
-                  className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-600"
-                />
-
-                <input
-                  id="name"
-                  type="text"
-                  autoComplete="name"
-                  placeholder="Enter your name"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className={inputStyle}
-                  required
-                />
-              </div>
-            </div>
-
-            {/* EMAIL */}
+          <form onSubmit={handleSubmit} className="mt-8 space-y-5">
             <div>
               <label
                 htmlFor="email"
@@ -210,7 +163,6 @@ export default function SignUpPage() {
               </div>
             </div>
 
-            {/* PASSWORD */}
             <div>
               <label
                 htmlFor="password"
@@ -228,12 +180,11 @@ export default function SignUpPage() {
                 <input
                   id="password"
                   type={showPassword ? "text" : "password"}
-                  autoComplete="new-password"
+                  autoComplete="current-password"
                   placeholder="Enter your password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className={`${inputStyle} pr-12`}
-                  minLength={8}
                   required
                 />
 
@@ -245,74 +196,56 @@ export default function SignUpPage() {
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-white"
                 >
-                  {showPassword ? (
-                    <EyeOff size={18} />
-                  ) : (
-                    <Eye size={18} />
-                  )}
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
               </div>
-
-              <p className="mt-2 text-sm text-zinc-500">
-                Minimum 8 characters.
-              </p>
             </div>
 
-            {/* CREATE ACCOUNT */}
             <button
               type="submit"
               className="pixel-font w-full border border-red-500 bg-red-600 px-4 py-5 text-xs text-white transition hover:bg-red-700 hover:shadow-[0_0_25px_rgba(220,38,38,0.35)]"
             >
-              CREATE ACCOUNT
+              SIGN IN
             </button>
 
+            <button
+              type="button"
+              onClick={handleReset}
+              className="w-full text-sm text-zinc-500 underline-offset-4 hover:text-red-400 hover:underline"
+            >
+              Forgot password?
+            </button>
           </form>
 
-          {/* DIVIDER */}
+          {!authActions.configured && (
+            <p className="mt-4 text-center text-xs text-amber-500">
+              Auth.js is not fully configured. Set AUTH_SECRET and DATABASE_URL
+              in .env.local (see .env.example).
+            </p>
+          )}
+          {authActions.status &&
+            !authActions.status.googleOAuthConfigured && (
+              <p className="mt-2 text-center text-xs text-zinc-600">
+                Google OAuth is not configured yet.
+              </p>
+            )}
+
           <div className="my-7 flex items-center gap-4">
             <div className="h-px flex-1 bg-zinc-800" />
-
             <span className="text-sm tracking-widest text-zinc-500">
               OR CONTINUE WITH
             </span>
-
             <div className="h-px flex-1 bg-zinc-800" />
           </div>
 
-          {/* GOOGLE BUTTON */}
           <button
             type="button"
             onClick={handleGoogle}
             className="flex w-full items-center justify-center gap-3 border border-zinc-700 bg-[#080808] px-5 py-3 text-lg transition hover:border-red-500 hover:bg-[#151515]"
           >
-            <svg
-              width="22"
-              height="22"
-              viewBox="0 0 48 48"
-              aria-hidden="true"
-            >
-              <path
-                fill="#4285F4"
-                d="M43.6 24.5c0-1.4-.1-2.8-.4-4.1H24v7.8h11a9.4 9.4 0 0 1-4.1 6.2v5.1h6.6c3.9-3.6 6.1-8.8 6.1-15z"
-              />
-              <path
-                fill="#34A853"
-                d="M24 44c5.5 0 10.1-1.8 13.5-4.5l-6.6-5.1c-1.8 1.2-4.1 1.9-6.9 1.9-5.3 0-9.8-3.6-11.4-8.4H5.8v5.3A20 20 0 0 0 24 44z"
-              />
-              <path
-                fill="#FBBC05"
-                d="M12.6 27.9a12 12 0 0 1 0-7.8v-5.3H5.8a20 20 0 0 0 0 18.4z"
-              />
-              <path
-                fill="#EA4335"
-                d="M24 11.7c3 0 5.7 1 7.8 3.1l5.8-5.8A20 20 0 0 0 5.8 14.8l6.8 5.3c1.6-4.8 6.1-8.4 11.4-8.4z"
-              />
-            </svg>
-
             Continue with Google
           </button>
 
-          {/* STATUS MESSAGE */}
           {message && (
             <p
               role="status"
@@ -322,24 +255,20 @@ export default function SignUpPage() {
             </p>
           )}
 
-          {/* SIGN IN */}
           <p className="mt-7 text-center text-lg text-zinc-500">
-            Already have an account?{" "}
+            No account yet?{" "}
             <Link
-              href="/sign-in"
+              href="/sign-up"
               className="text-red-500 transition hover:text-red-400"
             >
-              Sign in
+              Sign up
             </Link>
           </p>
-
         </div>
 
-        {/* FOOTER */}
         <p className="mt-8 text-center text-sm tracking-widest text-zinc-600">
           DARKBYTE // ACCESS INTERFACE
         </p>
-
       </div>
     </main>
   );

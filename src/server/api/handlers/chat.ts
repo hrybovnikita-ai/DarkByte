@@ -5,7 +5,7 @@ import { resolveAvailableModels, findResolvedModel } from "@/server/ai/discover"
 import { getAuthUser } from "@/server/auth/context";
 import { apiCreated, apiNoContent, apiSuccess, apiError, handleRouteError } from "@/server/api/response";
 import { readJsonBody } from "@/server/middleware/request";
-import { checkRateLimit } from "@/server/middleware/rate-limit";
+import { checkRateLimitAsync } from "@/server/middleware/rate-limit";
 import { spendCredits } from "@/server/credits/ledger";
 import { AiProviderError, streamModel, type ChatTurn } from "@/server/ai/providers";
 import { buildMemoryAugmentedHistory } from "@/server/memory/context";
@@ -88,7 +88,17 @@ export async function getConversation(request: Request, id: string) {
   const row = await requirePrisma().conversation.findUnique({
     where: { id },
     include: {
-      messages: { orderBy: { createdAt: "asc" }, select: { id: true, role: true, content: true, modelId: true, createdAt: true } },
+      messages: {
+        orderBy: { createdAt: "asc" },
+        select: {
+          id: true,
+          role: true,
+          content: true,
+          modelId: true,
+          createdAt: true,
+          feedbacks: { where: { userId: user.id }, select: { rating: true } },
+        },
+      },
     },
   });
   if (!row) throw new Error("NOT_FOUND");
@@ -99,7 +109,14 @@ export async function getConversation(request: Request, id: string) {
     modelId: row.modelId,
     updatedAt: row.updatedAt,
     createdAt: row.createdAt,
-    messages: row.messages,
+    messages: row.messages.map((m) => ({
+      id: m.id,
+      role: m.role,
+      content: m.content,
+      modelId: m.modelId,
+      createdAt: m.createdAt,
+      feedbackRating: m.feedbacks[0]?.rating ?? null,
+    })),
   });
 }
 
@@ -136,7 +153,7 @@ function sse(event: string, data: unknown) {
 }
 
 export async function streamConversationMessage(request: Request, id: string) {
-  const rate = checkRateLimit(request, "chat-stream");
+  const rate = await checkRateLimitAsync(request, "chat-stream");
   if (!rate.allowed) {
     const response = apiError("Too many requests", 429, "RATE_LIMIT", { retryAfter: rate.retryAfter });
     if (rate.retryAfter) response.headers.set("Retry-After", String(rate.retryAfter));

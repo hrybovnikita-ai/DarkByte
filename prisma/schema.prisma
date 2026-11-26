@@ -29,6 +29,7 @@ enum FavoriteTargetType {
 
 model User {
   id            String    @id @default(cuid())
+  clerkId       String?   @unique
   firebaseUid   String?   @unique
   email         String    @unique
   emailVerified DateTime?
@@ -49,6 +50,8 @@ model User {
   pixelProjects      PixelProject[]
   userAchievements   UserAchievement[]
   conversations        Conversation[]
+  messageFeedbacks     MessageFeedback[]
+  conversationShares   ConversationShare[]
   memoryProfile        UserMemoryProfile?
   preferences          UserPreference[]
   memoryEntries        MemoryEntry[]
@@ -249,14 +252,20 @@ model Conversation {
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   title     String?
   modelId   String    @default("gemini-3.8-flash")
+  branchedFromId        String?
+  branchedFromMessageId String?
+  parentConversation    Conversation?  @relation("ConversationBranch", fields: [branchedFromId], references: [id], onDelete: SetNull)
+  childBranches         Conversation[] @relation("ConversationBranch")
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 
   messages      Message[]
   conversationMemory ConversationMemory?
+  shares        ConversationShare[]
 
   @@index([userId])
   @@index([userId, updatedAt])
+  @@index([branchedFromId])
 }
 
 enum MemoryKind {
@@ -316,6 +325,41 @@ model MemoryEntry {
   @@index([userId, importance])
 }
 
+enum MessageFeedbackRating {
+  GOOD
+  BAD
+}
+
+model MessageFeedback {
+  id        String                @id @default(cuid())
+  messageId String
+  message   Message               @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  rating    MessageFeedbackRating
+  createdAt DateTime              @default(now())
+  updatedAt DateTime              @updatedAt
+
+  @@unique([messageId, userId])
+  @@index([userId])
+  @@index([messageId])
+}
+
+model ConversationShare {
+  id             String       @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  token          String       @unique
+  createdById    String
+  createdBy      User         @relation(fields: [createdById], references: [id], onDelete: Cascade)
+  revokedAt      DateTime?
+  expiresAt      DateTime?
+  createdAt      DateTime     @default(now())
+
+  @@index([conversationId])
+  @@index([createdById])
+}
+
 model Message {
   id             String       @id @default(cuid())
   conversationId String
@@ -324,6 +368,7 @@ model Message {
   content        String       @db.Text
   modelId        String?
   createdAt      DateTime     @default(now())
+  feedbacks      MessageFeedback[]
 
   @@index([conversationId])
   @@index([conversationId, createdAt])

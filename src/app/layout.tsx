@@ -4,7 +4,8 @@ import "@fontsource/press-start-2p";
 import "@fontsource/vt323";
 
 import "./globals.css";
-import { AuthProvider } from "@/contexts/AuthProvider";
+import { AppAuthProvider } from "@/contexts/AppAuthProvider";
+import { getAuthProviderMode } from "@/server/auth/provider";
 
 export const metadata: Metadata = {
   title: "DARKBYTE — Enter the Dark Side",
@@ -25,10 +26,11 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const authMode = getAuthProviderMode();
   return (
     <html lang="en" data-scroll-behavior="smooth">
       <body className="antialiased">
-        <AuthProvider>{children}</AuthProvider>
+        <AppAuthProvider mode={authMode}>{children}</AppAuthProvider>
       </body>
     </html>
   );

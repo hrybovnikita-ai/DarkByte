@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import SiteHeader from "@/components/layout/SiteHeader";
 import SiteFooter from "@/components/layout/SiteFooter";
-import { useAuth } from "@/contexts/AuthProvider";
+import { useAuth } from "@/contexts/auth-context";
 import PixelSkeleton from "@/components/ui/PixelSkeleton";
 
 function CheckoutSuccessBody() {

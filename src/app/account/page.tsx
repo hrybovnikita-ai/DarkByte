@@ -4,7 +4,7 @@ import Link from "next/link";
 import AccountCredits from "@/components/credits/AccountCredits";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
-import { useAuth } from "@/contexts/AuthProvider";
+import { useAuth } from "@/contexts/auth-context";
 import PixelSkeleton from "@/components/ui/PixelSkeleton";
 
 type Profile = {
@@ -16,7 +16,7 @@ type Profile = {
 };
 
 export default function AccountPage() {
-  const { user, loading } = useAuth();
+  const { user, loading, signOut } = useAuth();
   const router = useRouter();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [name, setName] = useState("");
@@ -24,7 +24,7 @@ export default function AccountPage() {
 
   useEffect(() => {
     if (!loading && !user) {
-      router.replace("/sign-in");
+      router.replace("/sign-in?callbackUrl=/account");
     }
   }, [loading, user, router]);
 
@@ -108,11 +108,34 @@ export default function AccountPage() {
         </form>
       )}
 
-      <AccountCredits />
+      <section id="credits" className="scroll-mt-24">
+        <AccountCredits />
+      </section>
+      <section id="conversations" className="mt-10 scroll-mt-24 border border-zinc-800 bg-[#101010] p-4">
+        <h2 className="text-sm tracking-widest text-red-400">MY CONVERSATIONS</h2>
+        <p className="mt-2 text-sm text-zinc-400">Your chat history stays on this account after sign-out.</p>
+        <Link href="/chat" className="mt-3 inline-block text-sm text-red-400 hover:text-red-300">Open chat →</Link>
+      </section>
+      <section id="memory" className="mt-6 scroll-mt-24 border border-zinc-800 bg-[#101010] p-4">
+        <h2 className="text-sm tracking-widest text-red-400">AI MEMORY</h2>
+        <p className="mt-2 text-sm text-zinc-400">Persistent memory is stored in Neon and is not cleared on logout.</p>
+      </section>
+      <section id="settings" className="mt-6 scroll-mt-24">
+        <p className="text-xs tracking-widest text-zinc-500">Profile settings are above. Credits, chats, and memory remain after sign-out.</p>
+      </section>
 
-      <Link href="/" className="mt-10 inline-block text-sm text-zinc-500 hover:text-red-500">
-        ← Back to home
-      </Link>
+      <div className="mt-10 flex flex-wrap items-center gap-4">
+        <Link href="/" className="rounded-lg border border-zinc-700 px-4 py-2 text-sm text-zinc-300 hover:border-red-500 hover:text-red-400">
+          ← Back to Home
+        </Link>
+        <button
+          type="button"
+          className="rounded-lg border border-red-700 px-4 py-2 text-sm text-red-400 hover:bg-red-950/40"
+          onClick={() => void signOut()}
+        >
+          Sign Out
+        </button>
+      </div>
     </main>
   );
 }

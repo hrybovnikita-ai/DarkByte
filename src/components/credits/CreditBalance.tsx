@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { useAuth } from "@/contexts/AuthProvider";
+import { useAuth } from "@/contexts/auth-context";
 import { apiFetch } from "@/lib/api-fetch";
 
 export default function CreditBalance() {

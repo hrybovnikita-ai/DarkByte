@@ -1,30 +1,14 @@
 "use client";
 
 import { SessionProvider, useSession, signOut as nextAuthSignOut } from "next-auth/react";
+import { useCallback, useMemo, type ReactNode } from "react";
 import {
-  createContext,
-  useCallback,
-  useContext,
-  useMemo,
-  type ReactNode,
-} from "react";
+  AuthContext,
+  type AuthContextValue,
+  type DarkbyteSessionUser,
+} from "@/contexts/auth-context";
 
-export type DarkbyteSessionUser = {
-  id: string;
-  email: string;
-  name?: string | null;
-  image?: string | null;
-  role: "USER" | "ADMIN";
-};
-
-type AuthContextValue = {
-  user: DarkbyteSessionUser | null;
-  loading: boolean;
-  configured: boolean;
-  signOut: () => Promise<void>;
-};
-
-const AuthContext = createContext<AuthContextValue | null>(null);
+export type { DarkbyteSessionUser };
 
 function AuthContextBridge({ children }: { children: ReactNode }) {
   const { data: session, status } = useSession();
@@ -65,12 +49,4 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       <AuthContextBridge>{children}</AuthContextBridge>
     </SessionProvider>
   );
-}
-
-export function useAuth() {
-  const ctx = useContext(AuthContext);
-  if (!ctx) {
-    throw new Error("useAuth must be used within AuthProvider");
-  }
-  return ctx;
 }

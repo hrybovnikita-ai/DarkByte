@@ -19,8 +19,14 @@ import {
 } from "@/server/auth/tokens";
 import { registerSchema } from "@/server/validators/auth";
 import { grantWelcomeCredits } from "@/server/credits/ledger";
+import { isClerkAuthEnabled } from "@/server/auth/provider";
+import { apiError } from "@/server/api/response";
 
 async function register(request: Request) {
+  if (isClerkAuthEnabled()) {
+    return apiError("Registration is handled by Clerk", 410, "AUTH_PROVIDER_CLERK");
+  }
+
   if (!isAuthFullyConfigured()) {
     return NextResponse.json(
       {

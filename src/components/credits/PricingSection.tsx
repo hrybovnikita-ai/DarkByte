@@ -2,7 +2,7 @@
 
 import { useRef, useState, type CSSProperties } from "react";
 import Link from "next/link";
-import { useAuth } from "@/contexts/AuthProvider";
+import { useAuth } from "@/contexts/auth-context";
 import { CREDIT_PLANS, type CreditPlanId } from "@/lib/credit-plans";
 
 const skull = ["00111100", "01111110", "11111111", "11011011", "11011011", "01111110", "00111100", "00100100"];

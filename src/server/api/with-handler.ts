@@ -1,5 +1,5 @@
 import { apiError, handleRouteError } from "@/server/api/response";
-import { checkRateLimit } from "@/server/middleware/rate-limit";
+import { checkRateLimitAsync } from "@/server/middleware/rate-limit";
 
 type RouteContext = { params: Promise<Record<string, string>> };
 
@@ -8,7 +8,7 @@ export function withApiHandler(
 ) {
   return async (request: Request, context: RouteContext): Promise<Response> => {
     try {
-      const rate = checkRateLimit(request, "api");
+      const rate = await checkRateLimitAsync(request, "api");
       if (!rate.allowed) {
         const response = apiError("Too many requests", 429, "RATE_LIMIT", {
           retryAfter: rate.retryAfter,

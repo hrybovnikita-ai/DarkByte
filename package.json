@@ -17,9 +17,12 @@
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.3",
+    "@clerk/nextjs": "^7.10.10",
     "@fontsource/press-start-2p": "^5.3.0",
     "@fontsource/vt323": "^5.3.0",
     "@prisma/client": "6.19.3",
+    "@upstash/ratelimit": "^2.2.2",
+    "@upstash/redis": "^1.41.1",
     "axios": "^1.21.1",
     "bcryptjs": "^3.0.3",
     "gsap": "^3.15.1",
@@ -35,6 +38,7 @@
     "react-markdown": "^10.1.0",
     "remark-gfm": "^4.0.1",
     "stripe": "^23.2.0",
+    "svix": "^2.11.1",
     "zod": "^4.6.7",
     "zustand": "^5.1.0"
   },
