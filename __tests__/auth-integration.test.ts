@@ -42,7 +42,12 @@ describe.skipIf(!hasDatabase)("Auth + Neon integration", () => {
       expect(row?.emailVerified).toBeTruthy();
       expect(await verifyPassword(password, row!.passwordHash!)).toBe(true);
     } finally {
-      await prisma.user.deleteMany({ where: { email } });
+      const row = await prisma.user.findUnique({ where: { email } });
+      if (row) {
+        await prisma.creditTransaction.deleteMany({ where: { userId: row.id } });
+        await prisma.creditAccount.deleteMany({ where: { userId: row.id } });
+        await prisma.user.delete({ where: { id: row.id } });
+      }
       await prisma.$disconnect();
     }
   });

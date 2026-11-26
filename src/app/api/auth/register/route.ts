@@ -18,6 +18,7 @@ import {
   createVerificationToken,
 } from "@/server/auth/tokens";
 import { registerSchema } from "@/server/validators/auth";
+import { grantWelcomeCredits } from "@/server/credits/ledger";
 
 async function register(request: Request) {
   if (!isAuthFullyConfigured()) {
@@ -67,6 +68,8 @@ async function register(request: Request) {
       createdAt: true,
     },
   });
+
+  await grantWelcomeCredits(user.id, prisma).catch(() => undefined);
 
   let emailVerified = false;
   let mail: Awaited<ReturnType<typeof sendAuthEmail>> = {

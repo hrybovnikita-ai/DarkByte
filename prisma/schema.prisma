@@ -39,12 +39,19 @@ model User {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
+  creditAccount    CreditAccount?
+  creditPurchases  CreditPurchase[]
+  creditTransactions CreditTransaction[]
+
   accounts         Account[]
   sessions         Session[]
   favorites          Favorite[]
   pixelProjects      PixelProject[]
   userAchievements   UserAchievement[]
-  conversations      Conversation[]
+  conversations        Conversation[]
+  memoryProfile        UserMemoryProfile?
+  preferences          UserPreference[]
+  memoryEntries        MemoryEntry[]
 
   @@index([role])
 }
@@ -241,12 +248,72 @@ model Conversation {
   userId    String
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   title     String?
+  modelId   String    @default("gemini-3.8-flash")
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 
-  messages Message[]
+  messages      Message[]
+  conversationMemory ConversationMemory?
 
   @@index([userId])
+  @@index([userId, updatedAt])
+}
+
+enum MemoryKind {
+  FACT
+  PREFERENCE
+  EPISODE
+}
+
+model UserMemoryProfile {
+  userId    String   @id
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  narrative String?  @db.Text
+  updatedAt DateTime @updatedAt
+}
+
+model UserPreference {
+  id                   String   @id @default(cuid())
+  userId               String
+  user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  key                  String
+  value                String   @db.Text
+  confidence           Float    @default(0.75)
+  sourceConversationId String?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@unique([userId, key])
+  @@index([userId])
+}
+
+model ConversationMemory {
+  conversationId String       @id
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  summary        String?      @db.Text
+  messageCount   Int          @default(0)
+  updatedAt      DateTime     @updatedAt
+}
+
+model MemoryEntry {
+  id                   String     @id @default(cuid())
+  userId               String
+  user                 User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kind                 MemoryKind
+  content              String     @db.Text
+  contentHash          String
+  importance           Float      @default(0.5)
+  embedding            Json?
+  sourceConversationId String?
+  sourceMessageId      String?
+  lastAccessedAt       DateTime?
+  createdAt            DateTime   @default(now())
+  updatedAt            DateTime   @updatedAt
+
+  @@index([userId])
+  @@index([userId, kind])
+  @@index([userId, contentHash])
+  @@index([userId, importance])
 }
 
 model Message {
@@ -255,9 +322,11 @@ model Message {
   conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   role           String
   content        String       @db.Text
+  modelId        String?
   createdAt      DateTime     @default(now())
 
   @@index([conversationId])
+  @@index([conversationId, createdAt])
 }
 
 model Company {
@@ -278,4 +347,52 @@ model Company {
 
   @@index([status, sortOrder])
   @@index([category])
+}
+model CreditAccount {
+  userId    String   @id
+  balance   Int      @default(0)
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Restrict)
+}
+
+model CreditPurchase {
+  id              String   @id @default(cuid())
+  userId          String
+  requestKey      String
+  planId          String
+  amountCents     Int
+  credits         Int
+  currency        String   @default("usd")
+  stripeSessionId String?  @unique
+  createdAt       DateTime @default(now())
+  fulfilledAt     DateTime?
+  user            User     @relation(fields: [userId], references: [id], onDelete: Restrict)
+  transaction     CreditTransaction?
+
+  @@unique([userId, requestKey])
+  @@index([userId, createdAt])
+}
+
+enum CreditTransactionKind {
+  PURCHASE
+  SPEND
+  BONUS
+}
+
+model CreditTransaction {
+  id                    String   @id @default(cuid())
+  userId                String
+  amount                Int
+  kind                  CreditTransactionKind
+  description           String
+  idempotencyKey        String   @unique
+  purchaseId            String?  @unique
+  stripeSessionId       String?  @unique
+  stripePaymentIntentId String?  @unique
+  stripeEventId         String?  @unique
+  createdAt             DateTime @default(now())
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Restrict)
+  purchase              CreditPurchase? @relation(fields: [purchaseId], references: [id], onDelete: Restrict)
+
+  @@index([userId, createdAt, id])
 }

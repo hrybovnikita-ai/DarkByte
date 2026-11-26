@@ -1,3 +1,4 @@
+import PricingSection from "@/components/credits/PricingSection";
 import HomeWorldsSection from "@/components/home/HomeWorldsSection";
 import SiteHeader from "@/components/layout/SiteHeader";
 import SiteFooter from "@/components/layout/SiteFooter";
@@ -267,6 +268,7 @@ export default function Home() {
 
         </section>
 
+        <PricingSection />
       </main>
 
       <SiteFooter />

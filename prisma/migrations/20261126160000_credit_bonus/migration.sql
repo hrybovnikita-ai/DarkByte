@@ -1,0 +1,1 @@
+ALTER TYPE "CreditTransactionKind" ADD VALUE IF NOT EXISTS 'BONUS';

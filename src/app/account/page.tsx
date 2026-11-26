@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import AccountCredits from "@/components/credits/AccountCredits";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
 import { useAuth } from "@/contexts/AuthProvider";
@@ -106,6 +107,8 @@ export default function AccountPage() {
           )}
         </form>
       )}
+
+      <AccountCredits />
 
       <Link href="/" className="mt-10 inline-block text-sm text-zinc-500 hover:text-red-500">
         ← Back to home

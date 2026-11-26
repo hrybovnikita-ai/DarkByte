@@ -1,31 +1,16 @@
-import fs from "node:fs";
-import path from "node:path";
+import nextEnv from "@next/env";
 
-for (const file of [".env", ".env.local"]) {
-  const full = path.resolve(process.cwd(), file);
-  if (!fs.existsSync(full)) {
-    continue;
-  }
-  const content = fs.readFileSync(full, "utf-8");
-  for (const line of content.split("\n")) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith("#")) {
-      continue;
-    }
-    const eq = trimmed.indexOf("=");
-    if (eq <= 0) {
-      continue;
-    }
-    const key = trimmed.slice(0, eq).trim();
-    let value = trimmed.slice(eq + 1).trim();
-    if (
-      (value.startsWith('"') && value.endsWith('"')) ||
-      (value.startsWith("'") && value.endsWith("'"))
-    ) {
-      value = value.slice(1, -1);
-    }
-    if (process.env[key] === undefined) {
-      process.env[key] = value;
-    }
-  }
+// Tests must never write to the application's Neon database by accident.
+nextEnv.loadEnvConfig(process.cwd());
+if (process.env.TEST_DATABASE_URL && process.env.TEST_DATABASE_URL === process.env.DATABASE_URL) {
+  throw new Error("TEST_DATABASE_URL must be separate from the application database.");
 }
+if (process.env.TEST_DATABASE_URL) {
+  process.env.DATABASE_URL = process.env.TEST_DATABASE_URL;
+} else {
+  delete process.env.DATABASE_URL;
+}
+
+// Isolated auth fixtures must not send real mail or use production secrets.
+process.env.AUTH_SECRET = 'darkbyte-local-test-secret-not-for-production';
+delete process.env.RESEND_API_KEY;

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { ZodError } from "zod";
 
 export type ApiErrorBody = {
@@ -54,10 +55,18 @@ export function apiError(
 }
 
 export function handleRouteError(error: unknown) {
+  if (error instanceof Prisma.PrismaClientKnownRequestError) {
+    if (error.code === "P2022") {
+      return apiError("Database schema is out of date. Run pending migrations.", 503, "DATABASE_SCHEMA_OUTDATED");
+    }
+  }
   if (error instanceof ZodError) {
     return apiError("Validation failed", 400, "VALIDATION_ERROR", error.flatten());
   }
   if (error instanceof Error) {
+    if (error.message === "PAYMENTS_NOT_CONFIGURED") {
+      return apiError("Stripe test payments are not configured yet.", 503, "PAYMENTS_NOT_CONFIGURED");
+    }
     if (error.message === "DATABASE_NOT_CONFIGURED") {
       return apiError(
         "Database is not configured. Set DATABASE_URL and run migrations.",
@@ -76,6 +85,9 @@ export function handleRouteError(error: unknown) {
     }
     if (error.message === "CONFLICT") {
       return apiError("Resource conflict", 409, "CONFLICT");
+    }
+    if (error.message === "INSUFFICIENT_CREDITS") {
+      return apiError("Not enough credits", 402, "INSUFFICIENT_CREDITS");
     }
   }
   return apiError("Internal server error", 500, "INTERNAL_ERROR");

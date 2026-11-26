@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { WORLDS } from "@/config/worlds";
+import CreditBalance from "@/components/credits/CreditBalance";
 import UserMenu from "@/components/layout/UserMenu";
 
 const NAV_LINKS = [
@@ -13,6 +14,7 @@ const NAV_LINKS = [
   { href: "/#pixel-studio", label: "Studio" },
   { href: "/games", label: "Games" },
   { href: "/terminal", label: "Terminal" },
+  { href: "/#pricing", label: "Pricing" },
 ];
 
 function navClass(pathname: string, href: string, active: boolean) {
@@ -24,6 +26,10 @@ function navClass(pathname: string, href: string, active: boolean) {
     return `${base} text-red-500`;
   }
   return `${base} text-zinc-400`;
+}
+
+function isChatActive(pathname: string) {
+  return pathname === "/chat" || pathname.startsWith("/chat/");
 }
 
 export default function SiteHeader() {
@@ -41,9 +47,11 @@ export default function SiteHeader() {
           DARK<span className="text-white">BYTE</span>
         </Link>
 
+        <div className="ml-auto xl:order-2"><CreditBalance /></div>
+
         <button
           type="button"
-          className="border border-zinc-700 px-3 py-2 text-sm text-zinc-300 md:hidden"
+          className="border border-zinc-700 px-3 py-2 text-sm text-zinc-300 xl:hidden"
           onClick={() => setMenuOpen((o) => !o)}
           aria-expanded={menuOpen}
           aria-label="Toggle navigation menu"
@@ -56,7 +64,7 @@ export default function SiteHeader() {
             menuOpen
               ? "absolute left-0 right-0 top-full flex max-h-[85vh] flex-col gap-4 overflow-y-auto border-b border-zinc-800 bg-[#080808] px-6 py-6"
               : "hidden"
-          } md:static md:flex md:max-h-none md:flex-row md:items-center md:gap-5 md:overflow-visible md:border-0 md:bg-transparent md:p-0`}
+          } xl:static xl:flex xl:max-h-none xl:flex-row xl:items-center xl:gap-5 xl:overflow-visible xl:border-0 xl:bg-transparent xl:p-0`}
         >
           {NAV_LINKS.map((link) => (
             <Link
@@ -87,9 +95,9 @@ export default function SiteHeader() {
             <div
               className={`${
                 worldsOpen ? "block" : "hidden"
-              } md:absolute md:left-0 md:top-full md:mt-2 md:min-w-[280px]`}
+              } xl:absolute xl:left-0 xl:top-full xl:mt-2 xl:min-w-[280px]`}
             >
-              <div className="mt-2 border border-zinc-800 bg-[#101010] p-2 shadow-xl md:mt-0">
+              <div className="mt-2 border border-zinc-800 bg-[#101010] p-2 shadow-xl xl:mt-0">
                 <Link
                   href="/worlds"
                   className="block border-b border-zinc-800 px-3 py-2 text-sm text-red-400 hover:bg-white/5"
@@ -129,15 +137,23 @@ export default function SiteHeader() {
               </div>
             </div>
           </div>
+
+          <Link
+            href="/chat"
+            className={navClass(pathname, "/chat", isChatActive(pathname))}
+            onClick={() => setMenuOpen(false)}
+          >
+            Chat
+          </Link>
         </nav>
 
-        <div className="hidden md:block">
+        <div className="hidden xl:order-3 xl:block">
           <UserMenu />
         </div>
       </div>
 
       {menuOpen && (
-        <div className="border-t border-zinc-800 px-6 py-4 md:hidden">
+        <div className="border-t border-zinc-800 px-6 py-4 xl:hidden">
           <UserMenu />
         </div>
       )}
