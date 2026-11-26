@@ -34,7 +34,7 @@ export default function AccountPage() {
     }
     let cancelled = false;
     async function load() {
-      const response = await fetch("/api/users/me", { credentials: "include" });
+      const response = await fetch("/api/users/me", { credentials: "include", cache: "no-store" });
       const body = await response.json();
       if (!cancelled && body.success) {
         setProfile(body.data as Profile);

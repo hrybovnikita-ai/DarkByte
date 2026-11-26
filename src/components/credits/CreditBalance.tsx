@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthProvider";
+import { apiFetch } from "@/lib/api-fetch";
 
 export default function CreditBalance() {
   const { user } = useAuth();
@@ -13,7 +14,8 @@ export default function CreditBalance() {
     const controller = new AbortController();
     async function refresh() {
       try {
-        const response = await fetch("/api/credits/balance", { cache: "no-store", signal: controller.signal });
+        const response = await apiFetch("/api/credits/balance", { cache: "no-store", signal: controller.signal });
+        if (response.status === 401) return;
         const body = await response.json();
         if (!response.ok || !body.success) throw new Error("Balance unavailable");
         if (!controller.signal.aborted) setResult({ userId: userId!, balance: body.data.balance, error: false });

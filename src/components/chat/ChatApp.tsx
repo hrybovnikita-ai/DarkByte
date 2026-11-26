@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthProvider";
+import { apiFetch } from "@/lib/api-fetch";
 import MarkdownMessage from "@/components/chat/MarkdownMessage";
 import PixelSkull from "@/components/chat/PixelSkull";
 
@@ -66,27 +67,44 @@ export default function ChatApp() {
     if (!loading && !user) router.replace("/sign-in?callbackUrl=/chat");
   }, [loading, user, router]);
 
+  const bootstrapForUserId = useRef<string | null>(null);
+
+  const redirectToSignIn = useCallback(() => {
+    bootstrapForUserId.current = null;
+    router.replace("/sign-in?callbackUrl=/chat");
+  }, [router]);
+
   const loadModels = useCallback(async () => {
-    const response = await fetch("/api/chat/models", { cache: "no-store" });
+    const response = await apiFetch("/api/chat/models", { cache: "no-store" });
+    if (response.status === 401) {
+      redirectToSignIn();
+      return;
+    }
     const body = await response.json();
     if (body.success) {
       setModels(body.data.models);
       const firstConfigured = body.data.models.find((m: ModelOption) => m.configured);
       if (firstConfigured) setModelId((prev) => body.data.models.some((m: ModelOption) => m.id === prev && m.configured) ? prev : firstConfigured.id);
     }
-  }, []);
-
-  const bootstrapDone = useRef(false);
+  }, [redirectToSignIn]);
 
   const loadConversations = useCallback(async (query = search) => {
     const url = query.trim() ? `/api/chat/conversations?search=${encodeURIComponent(query.trim())}` : "/api/chat/conversations";
-    const response = await fetch(url, { cache: "no-store" });
+    const response = await apiFetch(url, { cache: "no-store" });
+    if (response.status === 401) {
+      redirectToSignIn();
+      return;
+    }
     const body = await response.json();
     if (body.success) setConversations(body.data.items);
-  }, [search]);
+  }, [search, redirectToSignIn]);
 
   const loadConversation = useCallback(async (id: string) => {
-    const response = await fetch(`/api/chat/conversations/${id}`, { cache: "no-store" });
+    const response = await apiFetch(`/api/chat/conversations/${id}`, { cache: "no-store" });
+    if (response.status === 401) {
+      redirectToSignIn();
+      return;
+    }
     const body = await response.json();
     if (!body.success) {
       setError(apiFailureMessage(body, "Could not load conversation"));
@@ -96,22 +114,14 @@ export default function ChatApp() {
     setMessages(body.data.messages);
     setModelId(body.data.modelId);
     setMobileSidebar(false);
-  }, []);
+  }, [redirectToSignIn]);
 
   useEffect(() => {
-    if (!user) {
-      bootstrapDone.current = false;
-      return;
-    }
-    if (bootstrapDone.current) return;
-    bootstrapDone.current = true;
-    let cancelled = false;
-    void (async () => {
-      await Promise.all([loadModels(), loadConversations()]);
-      if (cancelled) bootstrapDone.current = false;
-    })();
-    return () => { cancelled = true; };
-  }, [user, loadModels, loadConversations]);
+    if (!user?.id) return;
+    if (bootstrapForUserId.current === user.id) return;
+    bootstrapForUserId.current = user.id;
+    void Promise.all([loadModels(), loadConversations()]);
+  }, [user?.id, loadModels, loadConversations]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -126,7 +136,7 @@ export default function ChatApp() {
 
   async function newChat() {
     setError("");
-    const response = await fetch("/api/chat/conversations", {
+    const response = await apiFetch("/api/chat/conversations", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ modelId }),
@@ -144,7 +154,7 @@ export default function ChatApp() {
   }
 
   async function removeChat(id: string) {
-    const response = await fetch(`/api/chat/conversations/${id}`, { method: "DELETE" });
+    const response = await apiFetch(`/api/chat/conversations/${id}`, { method: "DELETE" });
     if (!response.ok && response.status !== 204) {
       setError("Could not delete conversation");
       return;
@@ -159,7 +169,7 @@ export default function ChatApp() {
   async function saveRename(id: string) {
     const title = renameValue.trim();
     if (!title) return;
-    const response = await fetch(`/api/chat/conversations/${id}`, {
+    const response = await apiFetch(`/api/chat/conversations/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ title }),
@@ -175,7 +185,7 @@ export default function ChatApp() {
     if (!content.trim() || streaming) return;
     let conversationId = activeId;
     if (!conversationId) {
-      const created = await fetch("/api/chat/conversations", {
+      const created = await apiFetch("/api/chat/conversations", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ modelId }),
@@ -204,7 +214,7 @@ export default function ChatApp() {
     abortRef.current = new AbortController();
 
     try {
-      const response = await fetch(`/api/chat/conversations/${conversationId}/stream`, {
+      const response = await apiFetch(`/api/chat/conversations/${conversationId}/stream`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ content: content.trim(), modelId }),

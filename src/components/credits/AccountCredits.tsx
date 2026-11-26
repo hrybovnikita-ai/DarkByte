@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "@/contexts/AuthProvider";
+import { apiFetch } from "@/lib/api-fetch";
 
 type Entry = { id: string; amount: number; kind: string; description: string; createdAt: string; stripeSessionId: string | null };
 type Wallet = { userId: string; balance: number; items: Entry[]; nextCursor: string | null };
@@ -21,8 +22,8 @@ export default function AccountCredits() {
     if (!userId) return false;
     try {
       const responses = await Promise.all([
-        fetch("/api/credits/balance", { cache: "no-store", signal }),
-        fetch("/api/credits/history", { cache: "no-store", signal }),
+        apiFetch("/api/credits/balance", { cache: "no-store", signal }),
+        apiFetch("/api/credits/history", { cache: "no-store", signal }),
       ]);
       const [balance, history] = await Promise.all(responses.map((r) => r.json()));
       if (responses.some((r) => !r.ok) || !balance.success || !history.success) {
@@ -64,7 +65,7 @@ export default function AccountCredits() {
     if (!current?.nextCursor || busy) return;
     setBusy(true);
     try {
-      const response = await fetch("/api/credits/history?cursor=" + encodeURIComponent(current.nextCursor), { cache: "no-store" });
+      const response = await apiFetch("/api/credits/history?cursor=" + encodeURIComponent(current.nextCursor), { cache: "no-store" });
       const body = await response.json();
       if (!response.ok || !body.success) throw new Error("Could not load more transactions.");
       setWallet((previous) => previous && previous.userId === userId ? {

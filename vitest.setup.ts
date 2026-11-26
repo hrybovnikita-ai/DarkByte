@@ -1,4 +1,13 @@
 import nextEnv from "@next/env";
+import { vi } from "vitest";
+
+vi.mock("@/auth", () => ({
+  auth: vi.fn(async () => null),
+  handlers: { GET: vi.fn(), POST: vi.fn() },
+  signIn: vi.fn(),
+  signOut: vi.fn(),
+  isAuthProvidersConfigured: () => true,
+}));
 
 // Tests must never write to the application's Neon database by accident.
 nextEnv.loadEnvConfig(process.cwd());

@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { getToken } from "next-auth/jwt";
+import { readAuthTokenFromRequest } from "@/server/auth/session";
 
 export async function proxy(request: NextRequest) {
   if (!request.nextUrl.pathname.startsWith("/admin")) {
@@ -10,10 +10,7 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(new URL("/sign-in", request.url));
   }
 
-  const token = await getToken({
-    req: request,
-    secret: process.env.AUTH_SECRET,
-  });
+  const token = await readAuthTokenFromRequest(request);
 
   if (!token?.sub) {
     return NextResponse.redirect(new URL("/sign-in", request.url));

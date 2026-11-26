@@ -1,7 +1,7 @@
 import type { Role } from "@prisma/client";
-import { getToken } from "next-auth/jwt";
 import { requirePrisma } from "@/lib/db";
 import { isAuthSecretConfigured } from "@/server/auth/config";
+import { readAuthSession, readAuthTokenFromRequest } from "@/server/auth/session";
 
 export type AuthUser = {
   id: string;
@@ -30,12 +30,12 @@ export async function getAuthUser(
     return null;
   }
 
-  const token = await getToken({
-    req: request,
-    secret: process.env.AUTH_SECRET,
-  });
-
-  const userId = token?.id ?? token?.sub;
+  const session = await readAuthSession();
+  let userId = session?.user?.id ?? null;
+  if (!userId) {
+    const token = await readAuthTokenFromRequest(request);
+    userId = token?.id ? String(token.id) : token?.sub ? String(token.sub) : null;
+  }
   if (!userId) {
     if (options?.required) {
       throw new Error("UNAUTHORIZED");
