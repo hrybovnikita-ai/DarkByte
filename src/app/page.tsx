@@ -1,3 +1,4 @@
+import SubscriptionPricingSection from "@/components/billing/SubscriptionPricingSection";
 import PricingSection from "@/components/credits/PricingSection";
 import HomeWorldsSection from "@/components/home/HomeWorldsSection";
 import SiteHeader from "@/components/layout/SiteHeader";
@@ -268,6 +269,7 @@ export default function Home() {
 
         </section>
 
+        <SubscriptionPricingSection />
         <PricingSection />
       </main>
 

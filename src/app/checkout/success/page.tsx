@@ -8,12 +8,15 @@ import SiteFooter from "@/components/layout/SiteFooter";
 import { useAuth } from "@/contexts/auth-context";
 import PixelSkeleton from "@/components/ui/PixelSkeleton";
 
+type VerifyState = "pending" | "confirmed" | "waiting" | "failed";
+
 function CheckoutSuccessBody() {
   const { user, loading } = useAuth();
   const router = useRouter();
   const params = useSearchParams();
   const sessionId = params.get("session_id");
-  const [status, setStatus] = useState<"pending" | "confirmed" | "waiting">("pending");
+  const kind = params.get("kind");
+  const [status, setStatus] = useState<VerifyState>("pending");
 
   useEffect(() => {
     if (!loading && !user) router.replace("/sign-in?callbackUrl=/checkout/success");
@@ -23,7 +26,8 @@ function CheckoutSuccessBody() {
     if (!user || !sessionId) return;
     let cancelled = false;
     let attempts = 0;
-    async function verify() {
+
+    async function verifyCredits() {
       try {
         const response = await fetch("/api/credits/history", { cache: "no-store" });
         const body = await response.json();
@@ -37,38 +41,72 @@ function CheckoutSuccessBody() {
           window.dispatchEvent(new Event("credits-updated"));
           return;
         }
-        if (++attempts < 30) window.setTimeout(verify, 2000);
+        if (++attempts < 30) window.setTimeout(verifyCredits, 2000);
         else setStatus("waiting");
       } catch {
-        if (!cancelled && ++attempts < 30) window.setTimeout(verify, 2000);
+        if (!cancelled && ++attempts < 30) window.setTimeout(verifyCredits, 2000);
         else if (!cancelled) setStatus("waiting");
       }
     }
-    void verify();
-    return () => { cancelled = true; };
-  }, [user, sessionId]);
+
+    async function verifySubscription() {
+      try {
+        const response = await fetch("/api/billing/status", { cache: "no-store" });
+        const body = await response.json();
+        if (!response.ok || !body.success) throw new Error("Billing unavailable");
+        const confirmed = body.data.payments.some(
+          (entry: { sessionId: string | null; status: string; creditsGranted: boolean }) =>
+            entry.sessionId === sessionId && entry.status === "SUCCEEDED" && entry.creditsGranted,
+        );
+        if (cancelled) return;
+        if (confirmed) {
+          setStatus("confirmed");
+          window.dispatchEvent(new Event("credits-updated"));
+          return;
+        }
+        if (++attempts < 30) window.setTimeout(verifySubscription, 2000);
+        else setStatus("waiting");
+      } catch {
+        if (!cancelled && ++attempts < 30) window.setTimeout(verifySubscription, 2000);
+        else if (!cancelled) setStatus("waiting");
+      }
+    }
+
+    void (kind === "subscription" ? verifySubscription() : verifyCredits());
+    return () => {
+      cancelled = true;
+    };
+  }, [user, sessionId, kind]);
+
+  const isSubscription = kind === "subscription";
 
   return (
     <main className="mx-auto max-w-lg px-6 py-24 text-center">
       <p className="text-xs tracking-[0.25em] text-purple-400">{"// PAYMENT RECEIVED"}</p>
-      <h1 className="pixel-font mt-6 text-xl text-zinc-100">THANK YOU</h1>
+      <h1 className="pixel-font mt-6 text-xl text-zinc-100">
+        {status === "confirmed" ? "PAYMENT SUCCESSFUL" : "THANK YOU"}
+      </h1>
       {loading || !user ? (
         <PixelSkeleton className="mt-10" lines={3} />
       ) : (
         <>
           <p className="mt-6 text-sm leading-relaxed text-zinc-400" role="status">
             {status === "confirmed"
-              ? "Your credits are in your account. Spend them across DARKBYTE modules."
+              ? isSubscription
+                ? "Your subscription is active and credits have been added. Check your inbox for a test confirmation email."
+                : "Your credits are in your account. Spend them across DARKBYTE modules."
               : status === "waiting"
                 ? "Stripe confirmed payment, but crediting is still processing. Open your account and refresh in a moment."
-                : "Verifying your payment with Stripe…"}
+                : status === "failed"
+                  ? "Payment could not be verified. No credits were granted."
+                  : "Verifying your payment with Stripe…"}
           </p>
           <div className="mt-10 flex flex-col gap-4 sm:flex-row sm:justify-center">
             <Link
-              href="/account#credits"
+              href={isSubscription ? "/account#billing" : "/account#credits"}
               className="border border-purple-600 bg-purple-600 px-6 py-3 text-sm font-bold text-[#080808] hover:brightness-110"
             >
-              VIEW BALANCE
+              {isSubscription ? "VIEW BILLING" : "VIEW BALANCE"}
             </Link>
             <Link href="/" className="border border-zinc-700 px-6 py-3 text-sm text-zinc-300 hover:border-zinc-500">
               BACK HOME

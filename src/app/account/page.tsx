@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import AccountBilling from "@/components/billing/AccountBilling";
 import AccountCredits from "@/components/credits/AccountCredits";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
@@ -108,6 +109,7 @@ export default function AccountPage() {
         </form>
       )}
 
+      <AccountBilling />
       <section id="credits" className="scroll-mt-24">
         <AccountCredits />
       </section>

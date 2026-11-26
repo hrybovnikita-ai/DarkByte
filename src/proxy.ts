@@ -11,6 +11,8 @@ const isProtectedRoute = createRouteMatcher([
   "/chat/",
   "/account(.*)",
   "/admin(.*)",
+  "/checkout",
+  "/checkout/",
   "/checkout/success(.*)",
 ]);
 

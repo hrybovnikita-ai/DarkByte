@@ -44,6 +44,11 @@ model User {
   creditPurchases  CreditPurchase[]
   creditTransactions CreditTransaction[]
 
+  billingCustomer     BillingCustomer?
+  billingCheckouts    BillingCheckout[]
+  billingSubscriptions BillingSubscription[]
+  billingPayments     BillingPayment[]
+
   accounts         Account[]
   sessions         Session[]
   favorites          Favorite[]
@@ -422,6 +427,27 @@ enum CreditTransactionKind {
   PURCHASE
   SPEND
   BONUS
+  SUBSCRIPTION
+}
+
+enum BillingPeriod {
+  MONTH
+  YEAR
+}
+
+enum SubscriptionStatus {
+  INCOMPLETE
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  UNPAID
+}
+
+enum BillingPaymentStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+  CANCELED
 }
 
 model CreditTransaction {
@@ -435,9 +461,85 @@ model CreditTransaction {
   stripeSessionId       String?  @unique
   stripePaymentIntentId String?  @unique
   stripeEventId         String?  @unique
+  stripeInvoiceId       String?  @unique
   createdAt             DateTime @default(now())
   user                  User     @relation(fields: [userId], references: [id], onDelete: Restrict)
   purchase              CreditPurchase? @relation(fields: [purchaseId], references: [id], onDelete: Restrict)
 
   @@index([userId, createdAt, id])
+}
+
+model BillingCustomer {
+  userId             String   @id
+  stripeCustomerId   String   @unique
+  createdAt          DateTime @default(now())
+  user               User     @relation(fields: [userId], references: [id], onDelete: Restrict)
+}
+
+model BillingCheckout {
+  id              String        @id @default(cuid())
+  userId          String
+  requestKey      String
+  planId          String
+  billingPeriod   BillingPeriod
+  amountCents     Int
+  credits         Int
+  currency        String        @default("usd")
+  stripePriceId   String
+  stripeSessionId String?       @unique
+  createdAt       DateTime      @default(now())
+  user            User          @relation(fields: [userId], references: [id], onDelete: Restrict)
+  payments        BillingPayment[]
+
+  @@unique([userId, requestKey])
+  @@index([userId, createdAt])
+}
+
+model BillingSubscription {
+  id                   String             @id @default(cuid())
+  userId               String
+  planId               String
+  billingPeriod        BillingPeriod
+  status               SubscriptionStatus @default(INCOMPLETE)
+  stripeCustomerId     String
+  stripeSubscriptionId String             @unique
+  stripePriceId        String
+  currentPeriodEnd     DateTime?
+  cancelAtPeriodEnd    Boolean            @default(false)
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+  user                 User               @relation(fields: [userId], references: [id], onDelete: Restrict)
+  payments             BillingPayment[]
+
+  @@index([userId, status])
+  @@index([stripeCustomerId])
+}
+
+model BillingPayment {
+  id                    String               @id @default(cuid())
+  userId                String
+  checkoutId            String
+  subscriptionId        String?
+  planId                String
+  billingPeriod         BillingPeriod
+  amountCents           Int
+  currency              String               @default("usd")
+  credits               Int                  @default(0)
+  status                BillingPaymentStatus
+  stripeInvoiceId       String               @unique
+  stripeSessionId       String?              @unique
+  stripePaymentIntentId String?              @unique
+  stripeEventId         String?              @unique
+  cardBrand             String?
+  cardLast4             String?
+  failureCode           String?
+  creditsGrantedAt      DateTime?
+  receiptSentAt         DateTime?
+  createdAt             DateTime             @default(now())
+  user                  User                 @relation(fields: [userId], references: [id], onDelete: Restrict)
+  checkout              BillingCheckout      @relation(fields: [checkoutId], references: [id], onDelete: Restrict)
+  subscription          BillingSubscription? @relation(fields: [subscriptionId], references: [id], onDelete: Restrict)
+
+  @@index([userId, createdAt])
+  @@index([checkoutId])
 }
